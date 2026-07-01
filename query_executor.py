@@ -1,19 +1,16 @@
 import re
 import pandas as pd
 
+from data_profiler import has_comma_separated, has_number_with_unit, get_id_columns
+
 
 def _extract_numeric(value: str) -> float:
     match = re.search(r"(\d+(?:\.\d+)?)", str(value))
     return float(match.group(1)) if match else 0.0
 
 
-def _try_parse_duration(series: pd.Series) -> pd.Series:
-    if series.dtype != object:
-        return series
-    sample = series.dropna().iloc[0] if not series.dropna().empty else ""
-    if re.search(r"\d+\s*(min|Season|Seasons)", str(sample), re.IGNORECASE):
-        return series.dropna().apply(_extract_numeric)
-    return series
+def _extract_numeric_from_series(series: pd.Series) -> pd.Series:
+    return series.dropna().apply(_extract_numeric)
 
 
 def _split_and_count(series: pd.Series) -> pd.Series:
@@ -38,6 +35,7 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
         col, val = f["column"], str(f["value"])
         filtered = df[df[col].astype(str).str.contains(val, case=False, na=False)]
 
+    id_columns = get_id_columns(filtered)
     result_count = len(filtered)
 
     if operation == "filter":
@@ -46,13 +44,14 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
             "matching_rows": result_count,
             "columns": list(filtered.columns),
             "sample": filtered.head(5).to_dict(orient="records"),
+            "id_columns": id_columns,
         }
 
     elif operation == "value_counts":
         target = plan.get("target_column")
         limit = plan.get("limit") or 20
 
-        if target == "listed_in":
+        if has_comma_separated(filtered[target]):
             counts = _split_and_count(filtered[target]).head(limit)
         else:
             counts = filtered[target].value_counts().head(limit)
@@ -63,6 +62,7 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
             "limit": limit,
             "counts": {str(k): int(v) for k, v in counts.items()},
             "total_values": int(filtered[target].nunique()),
+            "id_columns": id_columns,
         }
 
     elif operation == "group_by_agg":
@@ -70,11 +70,9 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
         agg_col = plan.get("agg_column") or target
         agg_func = plan.get("agg_func", "count")
 
-        # If aggregation involves mean/sum on duration, parse numeric
         group = filtered.groupby(target)
-        if agg_func in ("mean", "sum") and agg_col == "duration":
-            series = _try_parse_duration(filtered[agg_col])
-            result = group.apply(lambda g: _try_parse_duration(g[agg_col]).agg(agg_func))
+        if agg_func in ("mean", "sum") and has_number_with_unit(filtered[agg_col]):
+            result = group[agg_col].apply(lambda g: _extract_numeric_from_series(g).agg(agg_func))
         else:
             result = group[agg_col].agg(agg_func)
 
@@ -87,6 +85,7 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
             "agg_func": agg_func,
             "results": {str(k): float(v) if isinstance(v, (int, float)) else str(v) for k, v in result.items()},
             "groups_count": len(result),
+            "id_columns": id_columns,
         }
 
     elif operation == "sort_limit":
@@ -103,6 +102,7 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
             "limit": limit,
             "results": sorted_df.to_dict(orient="records"),
             "total_after_filter": result_count,
+            "id_columns": id_columns,
         }
 
     else:

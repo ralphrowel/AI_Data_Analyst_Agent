@@ -1,0 +1,101 @@
+order_id,region,product,units,price,order_date,notes
+ORD1,North,Widget,1,9.99,2025-01-15,"Rush order, handle with care"
+ORD2,South,Gadget,2,14.99,2025-02-20,
+ORD3,East,Doohickey,3,19.99,2025-03-10,"Fragile, glass"
+ORD4,West,Thingamajig,4,24.99,2025-04-05,
+ORD5,North,Widget,5,9.99,2025-01-15,"Rush order, handle with care"
+ORD6,South,Gadget,6,14.99,2025-02-20,
+ORD7,East,Doohickey,7,19.99,2025-03-10,"Fragile, glass"
+ORD8,West,Thingamajig,8,24.99,2025-04-05,
+ORD9,North,Widget,9,9.99,2025-01-15,"Rush order, handle with care"
+ORD10,South,Gadget,10,14.99,2025-02-20,
+ORD11,East,Doohickey,1,19.99,2025-03-10,"Fragile, glass"
+ORD12,West,Thingamajig,2,24.99,2025-04-05,
+ORD13,North,Widget,3,9.99,2025-01-15,"Rush order, handle with care"
+ORD14,South,Gadget,4,14.99,2025-02-20,
+ORD15,East,Doohickey,5,19.99,2025-03-10,"Fragile, glass"
+ORD16,West,Thingamajig,6,24.99,2025-04-05,
+ORD17,North,Widget,7,9.99,2025-01-15,"Rush order, handle with care"
+ORD18,South,Gadget,8,14.99,2025-02-20,
+ORD19,East,Doohickey,9,19.99,2025-03-10,"Fragile, glass"
+ORD20,West,Thingamajig,10,24.99,2025-04-05,
+ORD21,North,Widget,1,9.99,2025-01-15,"Rush order, handle with care"
+ORD22,South,Gadget,2,14.99,2025-02-20,
+ORD23,East,Doohickey,3,19.99,2025-03-10,"Fragile, glass"
+ORD24,West,Thingamajig,4,24.99,2025-04-05,
+ORD25,North,Widget,5,9.99,2025-01-15,"Rush order, handle with care"
+ORD26,South,Gadget,6,14.99,2025-02-20,
+ORD27,East,Doohickey,7,19.99,2025-03-10,"Fragile, glass"
+ORD28,West,Thingamajig,8,24.99,2025-04-05,
+ORD29,North,Widget,9,9.99,2025-01-15,"Rush order, handle with care"
+ORD30,South,Gadget,10,14.99,2025-02-20,
+ORD31,East,Doohickey,1,19.99,2025-03-10,"Fragile, glass"
+ORD32,West,Thingamajig,2,24.99,2025-04-05,
+ORD33,North,Widget,3,9.99,2025-01-15,"Rush order, handle with care"
+ORD34,South,Gadget,4,14.99,2025-02-20,
+ORD35,East,Doohickey,5,19.99,2025-03-10,"Fragile, glass"
+ORD36,West,Thingamajig,6,24.99,2025-04-05,
+ORD37,North,Widget,7,9.99,2025-01-15,"Rush order, handle with care"
+ORD38,South,Gadget,8,14.99,2025-02-20,
+ORD39,East,Doohickey,9,19.99,2025-03-10,"Fragile, glass"
+ORD40,West,Thingamajig,10,24.99,2025-04-05,
+ORD41,North,Widget,1,9.99,2025-01-15,"Rush order, handle with care"
+ORD42,South,Gadget,2,14.99,2025-02-20,
+ORD43,East,Doohickey,3,19.99,2025-03-10,"Fragile, glass"
+ORD44,West,Thingamajig,4,24.99,2025-04-05,
+ORD45,North,Widget,5,9.99,2025-01-15,"Rush order, handle with care"
+ORD46,South,Gadget,6,14.99,2025-02-20,
+ORD47,East,Doohickey,7,19.99,2025-03-10,"Fragile, glass"
+ORD48,West,Thingamajig,8,24.99,2025-04-05,
+ORD49,North,Widget,9,9.99,2025-01-15,"Rush order, handle with care"
+ORD50,South,Gadget,10,14.99,2025-02-20,
+ORD51,East,Doohickey,1,19.99,2025-03-10,"Fragile, glass"
+ORD52,West,Thingamajig,2,24.99,2025-04-05,
+ORD53,North,Widget,3,9.99,2025-01-15,"Rush order, handle with care"
+ORD54,South,Gadget,4,14.99,2025-02-20,
+ORD55,East,Doohickey,5,19.99,2025-03-10,"Fragile, glass"
+ORD56,West,Thingamajig,6,24.99,2025-04-05,
+ORD57,North,Widget,7,9.99,2025-01-15,"Rush order, handle with care"
+ORD58,South,Gadget,8,14.99,2025-02-20,
+ORD59,East,Doohickey,9,19.99,2025-03-10,"Fragile, glass"
+ORD60,West,Thingamajig,10,24.99,2025-04-05,
+ORD61,North,Widget,1,9.99,2025-01-15,"Rush order, handle with care"
+ORD62,South,Gadget,2,14.99,2025-02-20,
+ORD63,East,Doohickey,3,19.99,2025-03-10,"Fragile, glass"
+ORD64,West,Thingamajig,4,24.99,2025-04-05,
+ORD65,North,Widget,5,9.99,2025-01-15,"Rush order, handle with care"
+ORD66,South,Gadget,6,14.99,2025-02-20,
+ORD67,East,Doohickey,7,19.99,2025-03-10,"Fragile, glass"
+ORD68,West,Thingamajig,8,24.99,2025-04-05,
+ORD69,North,Widget,9,9.99,2025-01-15,"Rush order, handle with care"
+ORD70,South,Gadget,10,14.99,2025-02-20,
+ORD71,East,Doohickey,1,19.99,2025-03-10,"Fragile, glass"
+ORD72,West,Thingamajig,2,24.99,2025-04-05,
+ORD73,North,Widget,3,9.99,2025-01-15,"Rush order, handle with care"
+ORD74,South,Gadget,4,14.99,2025-02-20,
+ORD75,East,Doohickey,5,19.99,2025-03-10,"Fragile, glass"
+ORD76,West,Thingamajig,6,24.99,2025-04-05,
+ORD77,North,Widget,7,9.99,2025-01-15,"Rush order, handle with care"
+ORD78,South,Gadget,8,14.99,2025-02-20,
+ORD79,East,Doohickey,9,19.99,2025-03-10,"Fragile, glass"
+ORD80,West,Thingamajig,10,24.99,2025-04-05,
+ORD81,North,Widget,1,9.99,2025-01-15,"Rush order, handle with care"
+ORD82,South,Gadget,2,14.99,2025-02-20,
+ORD83,East,Doohickey,3,19.99,2025-03-10,"Fragile, glass"
+ORD84,West,Thingamajig,4,24.99,2025-04-05,
+ORD85,North,Widget,5,9.99,2025-01-15,"Rush order, handle with care"
+ORD86,South,Gadget,6,14.99,2025-02-20,
+ORD87,East,Doohickey,7,19.99,2025-03-10,"Fragile, glass"
+ORD88,West,Thingamajig,8,24.99,2025-04-05,
+ORD89,North,Widget,9,9.99,2025-01-15,"Rush order, handle with care"
+ORD90,South,Gadget,10,14.99,2025-02-20,
+ORD91,East,Doohickey,1,19.99,2025-03-10,"Fragile, glass"
+ORD92,West,Thingamajig,2,24.99,2025-04-05,
+ORD93,North,Widget,3,9.99,2025-01-15,"Rush order, handle with care"
+ORD94,South,Gadget,4,14.99,2025-02-20,
+ORD95,East,Doohickey,5,19.99,2025-03-10,"Fragile, glass"
+ORD96,West,Thingamajig,6,24.99,2025-04-05,
+ORD97,North,Widget,7,9.99,2025-01-15,"Rush order, handle with care"
+ORD98,South,Gadget,8,14.99,2025-02-20,
+ORD99,East,Doohickey,9,19.99,2025-03-10,"Fragile, glass"
+ORD100,West,Thingamajig,10,24.99,2025-04-05,

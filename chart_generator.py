@@ -14,6 +14,7 @@ def _has_year_like_keys(data: dict) -> bool:
 
 def generate_chart(result: dict, output_path: str = "chart.png"):
     op = result.get("operation")
+    id_cols = set(result.get("id_columns", []))
 
     if op in ("unsupported", "filter"):
         return
@@ -72,7 +73,7 @@ def generate_chart(result: dict, output_path: str = "chart.png"):
         target = result.get("target_column", list(results[0].keys())[0])
         labels = [r.get(target, "") for r in results]
         if _has_year_like_keys({str(k): 1 for k in labels}):
-            other_cols = [c for c in results[0].keys() if c != target and c != "show_id"]
+            other_cols = [c for c in results[0].keys() if c != target and c not in id_cols]
             value_col = other_cols[0] if other_cols else None
             if value_col:
                 values = [r.get(value_col, 0) for r in results]
