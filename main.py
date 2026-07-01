@@ -1,24 +1,35 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 
 from dataloader import load_data, describe_dataframe
-from query_planner import get_query_plan
+from query_planner import get_query_plan, get_summary
+from query_executor import execute_plan
+from chart_generator import generate_chart
 
-# Setup
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
-# Stage 2: load and describe the data
+question = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else input("Enter your question: ")
+
 df = load_data("data/netflix_titles.csv")
 description = describe_dataframe(df)
 
-# Stage 3: ask Gemini to turn a question into a structured plan
-question = "What is the average duration of TV shows in minutes?"
-plan = get_query_plan(question, description, client)
+print(f"\nQuestion: {question}")
+print("---")
 
-print("Question:", question)
-print("Plan returned by Gemini:")
-print(plan)
+plan = get_query_plan(question, description, client)
+print(f"Plan: {plan}")
+
+result = execute_plan(df, plan)
+print(f"Result: {result}")
+
+summary = get_summary(question, result, client)
+print(f"\nSummary:\n{summary}")
+
+chart_path = "chart.png"
+generate_chart(result, chart_path)
+print(f"\nChart saved: {chart_path}")
