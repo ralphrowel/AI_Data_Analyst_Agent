@@ -31,9 +31,34 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
 
     filtered = df
     if plan.get("filter"):
-        f = plan["filter"]
-        col, val = f["column"], str(f["value"])
-        filtered = df[df[col].astype(str).str.contains(val, case=False, na=False)]
+        filters = plan["filter"] if isinstance(plan["filter"], list) else [plan["filter"]]
+        for f in filters:
+            col, val = f["column"], f["value"]
+            op = f.get("operator", "contains")
+            
+            if op == "contains":
+                filtered = filtered[filtered[col].astype(str).str.contains(str(val), case=False, na=False)]
+            elif op == "eq":
+                filtered = filtered[filtered[col].astype(str) == str(val)]
+            elif op == "date_month_year":
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    dt = pd.to_datetime(filtered[col], errors="coerce")
+                month, year = val["month"], val["year"]
+                filtered = filtered[(dt.dt.month == month) & (dt.dt.year == year)]
+            elif op == "date_year":
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    dt = pd.to_datetime(filtered[col], errors="coerce")
+                filtered = filtered[dt.dt.year == val]
+            elif op == "date_month":
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    dt = pd.to_datetime(filtered[col], errors="coerce")
+                filtered = filtered[dt.dt.month == val]
 
     id_columns = get_id_columns(filtered)
     result_count = len(filtered)

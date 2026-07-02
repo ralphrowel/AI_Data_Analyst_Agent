@@ -13,10 +13,19 @@ DATASET DESCRIPTION:
 
 ALLOWED OPERATIONS: {ALLOWED_OPERATIONS}
 
+FILTER CAPABILITIES:
+- Multiple filters: pass a list of filter objects to combine with AND
+- Each filter supports operators:
+  * "contains" (default): case-insensitive substring match on string column
+  * "eq": exact string match
+  * "date_month_year": {{"month": int, "year": int}} on a date-like column
+  * "date_year": int on a date-like column
+  * "date_month": int on a date-like column
+
 JSON FORMAT:
 {{
   "operation": one of {ALLOWED_OPERATIONS},
-  "filter": {{"column": "...", "value": "..."}} or null,
+  "filter": [{{"column": "...", "operator": "...", "value": ...}}] or null,
   "target_column": "the column to analyze",
   "agg_column": "the column to aggregate, only for group_by_agg" or null,
   "agg_func": "mean/sum/count, only for group_by_agg" or null,
