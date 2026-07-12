@@ -49,6 +49,21 @@ class AnalysisResponse(BaseModel):
 def health_check():
     return {"status": "AI Data Analyst API is running"}
 
+SUGGESTION_PROMPT = """You are a data analyst. Based on this dataset description, generate exactly 4 example questions a user might want to ask. They should be diverse, practical, and demonstrate different analysis types (counting, top N, aggregation, filtering). Return ONLY a JSON array of 4 strings, no explanation.
+
+Dataset:
+{data_description}"""
+
+@app.get("/api/suggestions")
+def get_suggestions():
+    prompt = SUGGESTION_PROMPT.format(data_description=data_description)
+    resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    raw = resp.text.strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`").lstrip("json").strip()
+    import json
+    return json.loads(raw)
+
 @app.post("/api/ask", response_model=AnalysisResponse)
 def ask(request: QuestionRequest):
     # Step 1: question → query plan

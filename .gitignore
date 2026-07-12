@@ -17,3 +17,7 @@ Thumbs.db
 
 # Test cache
 .pytest_cache/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
