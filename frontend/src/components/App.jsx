@@ -17,7 +17,9 @@ export default function App() {
     total_tokens: 0,
   });
   const [chartType, setChartType] = useState(null);
+  const [chartEnabled, setChartEnabled] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     fetchSuggestions()
@@ -74,16 +76,20 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen bg-surface-950">
+    <div className="flex h-screen bg-white text-surface-800">
       <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((prev) => !prev)}
         tokenUsage={tokenUsage}
-        chartType={chartType}
-        onChartTypeChange={setChartType}
       />
       <ChatPanel
         messages={messages}
         suggestions={suggestions}
         isStreaming={isStreaming}
+        chartType={chartType}
+        chartEnabled={chartEnabled}
+        onChartTypeChange={setChartType}
+        onChartEnabledChange={setChartEnabled}
         onSubmit={handleSubmit}
       />
       {charts.length > 0 && (

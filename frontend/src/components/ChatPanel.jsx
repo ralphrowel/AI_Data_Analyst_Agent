@@ -1,37 +1,67 @@
+import { useState } from "react";
 import SuggestedPrompts from "./SuggestedPrompts";
 import MessageList from "./MessageList";
 import InputBar from "./InputBar";
+import Toolbar from "./Toolbar";
 
 export default function ChatPanel({
   messages,
   suggestions,
   isStreaming,
+  chartType,
+  chartEnabled,
+  onChartTypeChange,
+  onChartEnabledChange,
   onSubmit,
 }) {
+  const [input, setInput] = useState("");
+
+  const handleSubmit = (question) => {
+    if (!question.trim() || isStreaming) return;
+    onSubmit(question);
+    setInput("");
+  };
+
+  const isEmpty = messages.length === 0;
+
   return (
-    <div className="flex-1 flex flex-col min-w-0">
-      {messages.length === 0 ? (
+    <div className="flex-1 flex flex-col min-w-0 bg-white">
+      {isEmpty ? (
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex items-center justify-center px-6">
-            <div className="text-center max-w-md">
-              <h2 className="text-xl font-semibold text-surface-50 mb-2">
-                What would you like to know?
-              </h2>
-              <p className="text-sm text-surface-400 mb-8">
-                Ask a question about your dataset and get instant analysis with charts.
-              </p>
-              <SuggestedPrompts prompts={suggestions} onClick={onSubmit} />
-            </div>
+          <div className="flex-1" />
+          <div className="px-6 pb-4 max-w-2xl mx-auto w-full">
+            <SuggestedPrompts prompts={suggestions} onClick={handleSubmit} />
+            <Toolbar
+              chartType={chartType}
+              chartEnabled={chartEnabled}
+              onChartTypeChange={onChartTypeChange}
+              onChartEnabledChange={onChartEnabledChange}
+            />
+            <InputBar
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSubmit}
+              isStreaming={isStreaming}
+            />
           </div>
-          <div className="border-t border-surface-800 px-4 py-4">
-            <InputBar onSubmit={onSubmit} isStreaming={isStreaming} />
-          </div>
+          <div className="h-12" />
         </div>
       ) : (
         <>
           <MessageList messages={messages} />
-          <div className="border-t border-surface-800 px-4 py-4">
-            <InputBar onSubmit={onSubmit} isStreaming={isStreaming} />
+          <div className="px-6 py-4 max-w-2xl mx-auto w-full">
+            <Toolbar
+              chartType={chartType}
+              chartEnabled={chartEnabled}
+              onChartTypeChange={onChartTypeChange}
+              onChartEnabledChange={onChartEnabledChange}
+            />
+            <InputBar
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSubmit}
+              isStreaming={isStreaming}
+            />
           </div>
         </>
       )}
