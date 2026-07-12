@@ -33,6 +33,12 @@ JSON FORMAT:
   "limit": integer or null
 }}
 
+OPERATION GUIDANCE:
+- Use "value_counts" for any question asking about most common, most frequent, or top N of a column. The "limit" field controls how many results to return.
+- Use "group_by_agg" when grouping one column and computing a number (sum, mean, count) from another column.
+- Use "sort_limit" only when sorting the raw rows of the dataset itself, not aggregated results.
+- "unsupported" should only be used when the question genuinely cannot be answered with the available columns — not because of uncertainty about which operation to use.
+
 If the question cannot be answered with the available columns or operations, 
 return {{"operation": "unsupported", "reason": "explain why in plain English"}}.
 
