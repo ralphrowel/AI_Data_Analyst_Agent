@@ -13,6 +13,8 @@ from query_planner import get_query_plan, get_summary
 from query_executor import execute_plan
 from chart_generator import generate_chart
 
+_suggestions_cache = None
+
 # Load environment
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -27,7 +29,8 @@ app = FastAPI()
 # Allow React (running on a different port) to talk to this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -56,18 +59,25 @@ Dataset:
 
 @app.get("/api/suggestions")
 def get_suggestions():
+    global _suggestions_cache
+    if _suggestions_cache is not None:
+        return _suggestions_cache
+
     prompt = SUGGESTION_PROMPT.format(data_description=data_description)
     resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     raw = resp.text.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").lstrip("json").strip()
     import json
-    return json.loads(raw)
+    _suggestions_cache = json.loads(raw)
+    return _suggestions_cache
 
 @app.post("/api/ask", response_model=AnalysisResponse)
 def ask(request: QuestionRequest):
     # Step 1: question → query plan
-    plan = get_query_plan(request.question, data_description, client)
+    result = get_query_plan(request.question, data_description, client)
+    plan = result["plan"]
+    usage = result["usage"]
 
     # Step 2: handle unsupported questions immediately
     if plan.get("operation") == "unsupported":
@@ -76,19 +86,19 @@ def ask(request: QuestionRequest):
             chart_base64=None,
             operation="unsupported",
             unsupported_reason=plan.get("reason"),
-            usage={"prompt_tokens": 0, "response_tokens": 0, "total_tokens": 0}
+            usage=usage
         )
 
     # Step 3: execute the plan against real data
-    result = execute_plan(df, plan)
+    exec_result = execute_plan(df, plan)
 
-    # Step 4: get plain-English summary
-    summary = get_summary(request.question, result, client)
+    # Step 4: get plain-English summary (also capture usage from the second call)
+    summary = get_summary(request.question, exec_result, client)
 
     # Step 5: generate chart and convert to base64 string
     chart_base64 = None
     try:
-        generate_chart(result)
+        generate_chart(exec_result)
         if os.path.exists("chart.png"):
             with open("chart.png", "rb") as f:
                 chart_base64 = base64.b64encode(f.read()).decode("utf-8")
@@ -100,5 +110,5 @@ def ask(request: QuestionRequest):
         chart_base64=chart_base64,
         operation=plan.get("operation"),
         unsupported_reason=None,
-        usage={"prompt_tokens": 0, "response_tokens": 0, "total_tokens": 0}
+        usage=usage
     )

@@ -3,6 +3,7 @@ import { fetchSuggestions, askQuestion } from "../api";
 import Sidebar from "./Sidebar";
 import ChatPanel from "./ChatPanel";
 import ChartPanel from "./ChartPanel";
+import Header from "./Header";
 
 let messageId = 0;
 
@@ -20,6 +21,13 @@ export default function App() {
   const [chartEnabled, setChartEnabled] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const handleClearChat = useCallback(() => {
+    setMessages([]);
+    setCharts([]);
+    setCurrentChartIndex(0);
+    setTokenUsage({ prompt_tokens: 0, response_tokens: 0, total_tokens: 0 });
+  }, []);
 
   useEffect(() => {
     fetchSuggestions()
@@ -77,11 +85,24 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-white text-surface-800">
+      <div className="relative z-[3] h-full">
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((prev) => !prev)}
         tokenUsage={tokenUsage}
       />
+      </div>
+      <div className="flex flex-col flex-1 min-w-0">
+      <div className="relative z-[2]">
+      <Header
+        chartType={chartType}
+        chartEnabled={chartEnabled}
+        onChartTypeChange={setChartType}
+        onChartEnabledChange={setChartEnabled}
+        onClearChat={handleClearChat}
+      />
+      </div>
+      <div className="flex flex-1 min-h-0 relative z-[1]">
       <ChatPanel
         messages={messages}
         suggestions={suggestions}
@@ -99,6 +120,8 @@ export default function App() {
           onIndexChange={setCurrentChartIndex}
         />
       )}
+    </div>
+    </div>
     </div>
   );
 }

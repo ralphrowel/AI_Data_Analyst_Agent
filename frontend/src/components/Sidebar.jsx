@@ -23,7 +23,7 @@ export default function Sidebar({ collapsed, onToggle, tokenUsage }) {
     <aside
       className={`${
         collapsed ? "w-14" : "w-56"
-      } shrink-0 border-r border-surface-200 bg-surface-100 flex flex-col transition-all duration-200`}
+      } shrink-0 border-r border-surface-200 bg-surface-100 flex flex-col transition-all duration-200 h-full`}
     >
       <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} p-3 border-b border-surface-200`}>
         {!collapsed && (

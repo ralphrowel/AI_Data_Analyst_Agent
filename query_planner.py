@@ -59,7 +59,15 @@ def get_query_plan(question: str, data_description: str, client) -> dict:
     if raw_text.startswith("```"):
         raw_text = raw_text.strip("`").lstrip("json").strip()
     
-    return json.loads(raw_text)
+    plan = json.loads(raw_text)
+    
+    usage = {
+        "prompt_tokens": response.usage_metadata.prompt_token_count,
+        "response_tokens": response.usage_metadata.candidates_token_count,
+        "total_tokens": response.usage_metadata.total_token_count,
+    }
+    
+    return {"plan": plan, "usage": usage}
 
 
 def build_summary_prompt(question: str, result: dict) -> str:
