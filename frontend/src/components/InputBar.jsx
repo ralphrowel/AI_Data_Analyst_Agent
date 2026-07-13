@@ -13,7 +13,7 @@ export default function InputBar({ value, onChange, onSubmit, isStreaming }) {
         onChange={(e) => onChange(e.target.value)}
         placeholder="Ask a question about your data..."
         disabled={isStreaming}
-        className="flex-1 bg-white border border-surface-300 rounded-xl px-4 py-3 text-sm text-surface-800 placeholder-surface-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent disabled:opacity-50"
+        className="flex-1 bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm text-surface-800 dark:text-gray-100 placeholder-surface-400 dark:placeholder-gray-500 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent disabled:opacity-50"
       />
       <button
         type="submit"

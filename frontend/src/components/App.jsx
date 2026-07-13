@@ -21,6 +21,18 @@ export default function App() {
   const [chartEnabled, setChartEnabled] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("darkMode") === "true"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("darkMode", darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
 
   const handleClearChat = useCallback(() => {
     setMessages([]);
@@ -84,7 +96,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen bg-white text-surface-800">
+    <div className="flex h-screen bg-white dark:bg-gray-900 text-surface-800 dark:text-gray-100">
       <div className="relative z-[3] h-full">
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -100,6 +112,8 @@ export default function App() {
         onChartTypeChange={setChartType}
         onChartEnabledChange={setChartEnabled}
         onClearChat={handleClearChat}
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
       />
       </div>
       <div className="flex flex-1 min-h-0 relative z-[1]">

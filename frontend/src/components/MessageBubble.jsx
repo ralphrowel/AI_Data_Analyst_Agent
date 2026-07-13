@@ -38,12 +38,12 @@ export default function MessageBubble({ message }) {
         className={`max-w-[75%] rounded-2xl px-4 py-3 ${
           isUser
             ? "bg-accent text-white rounded-br-md"
-            : "bg-surface-100 text-surface-800 rounded-bl-md border border-surface-200"
+            : "bg-surface-100 dark:bg-gray-800 text-surface-800 dark:text-gray-100 rounded-bl-md border border-surface-200 dark:border-gray-700"
         }`}
       >
         <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
         {!isUser && (
-          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-surface-200/50">
+          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-surface-200/50 dark:border-gray-700/50">
             <button
               onClick={handleCopy}
               className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 hover:text-surface-700 hover:bg-surface-200/50"
@@ -61,7 +61,7 @@ export default function MessageBubble({ message }) {
             </button>
             <button
               onClick={handleDownloadCsv}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 hover:text-surface-700 hover:bg-surface-200/50"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200/50 dark:hover:bg-gray-700/50"
               title="Download result as CSV"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -74,7 +74,7 @@ export default function MessageBubble({ message }) {
           <img
             src={`data:image/png;base64,${message.chart_base64}`}
             alt="Chart"
-            className="mt-3 rounded-lg w-full max-h-80 object-contain bg-white border border-surface-200"
+            className="mt-3 rounded-lg w-full max-h-80 object-contain bg-white dark:bg-gray-800 border border-surface-200 dark:border-gray-700"
           />
         )}
       </div>

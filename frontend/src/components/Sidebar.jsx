@@ -23,15 +23,15 @@ export default function Sidebar({ collapsed, onToggle, tokenUsage }) {
     <aside
       className={`${
         collapsed ? "w-14" : "w-56"
-      } shrink-0 border-r border-surface-200 bg-surface-100 flex flex-col transition-all duration-200 h-full`}
+      } shrink-0 border-r border-surface-200 dark:border-gray-700 bg-surface-100 dark:bg-gray-800 flex flex-col transition-all duration-200 h-full`}
     >
-      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} p-3 border-b border-surface-200`}>
+      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} p-3 border-b border-surface-200 dark:border-gray-700`}>
         {!collapsed && (
-          <span className="text-sm font-semibold text-surface-800 tracking-tight">Menu</span>
+          <span className="text-sm font-semibold text-surface-800 dark:text-gray-100 tracking-tight">Menu</span>
         )}
         <button
           onClick={onToggle}
-          className="p-1.5 rounded-md text-surface-500 hover:text-surface-700 hover:bg-surface-200 transition-colors cursor-pointer"
+          className="p-1.5 rounded-md text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -50,8 +50,8 @@ export default function Sidebar({ collapsed, onToggle, tokenUsage }) {
             key={item.id}
             className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-md text-sm transition-colors cursor-pointer ${
               item.active
-                ? "bg-accent-subtle text-accent font-medium"
-                : "text-surface-500 hover:bg-surface-200 hover:text-surface-700"
+                ? "bg-accent-subtle dark:bg-accent/10 text-accent font-medium"
+                : "text-surface-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-surface-700 dark:hover:text-gray-200"
             } ${collapsed ? "justify-center px-0" : ""}`}
             title={collapsed ? item.label : undefined}
           >
@@ -62,7 +62,7 @@ export default function Sidebar({ collapsed, onToggle, tokenUsage }) {
       </nav>
 
       {!collapsed && tokenUsage && (
-        <div className="p-3 border-t border-surface-200">
+        <div className="p-3 border-t border-surface-200 dark:border-gray-700">
           <TokenUsageDisplay usage={tokenUsage} />
         </div>
       )}
