@@ -3,6 +3,38 @@ import pandas as pd
 
 from data_profiler import has_comma_separated, has_number_with_unit, get_id_columns
 
+FREE_TEXT_COLUMNS = {"title", "description", "cast", "director"}
+HIGH_CARD_TEXT = {"duration", "date_added"}
+
+
+def _pick_chart_column(filtered_df, id_columns):
+    """Find the best column for a value-counts chart from the filtered subset.
+
+    Excludes free-text, high-cardinality-text, and id columns.
+    Picks the column whose unique-value count is closest to the ideal 2–6 range.
+    Returns (column_name, {value: count}) or (None, None).
+    """
+    exclude = FREE_TEXT_COLUMNS | HIGH_CARD_TEXT | set(id_columns)
+    best_col = None
+    best_counts = None
+    best_distance = float("inf")
+
+    for col in filtered_df.columns:
+        if col in exclude:
+            continue
+        nunique = filtered_df[col].nunique()
+        if nunique <= 1:
+            continue
+        distance = abs(nunique - 4)
+        if distance < best_distance:
+            best_distance = distance
+            best_col = col
+            best_counts = filtered_df[col].value_counts()
+
+    if best_col is not None:
+        return best_col, {str(k): int(v) for k, v in best_counts.items()}
+    return None, None
+
 
 def _extract_numeric(value: str) -> float:
     match = re.search(r"(\d+(?:\.\d+)?)", str(value))
@@ -64,12 +96,15 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
     result_count = len(filtered)
 
     if operation == "filter":
+        chart_col, chart_counts = _pick_chart_column(filtered, id_columns)
         return {
             "operation": "filter",
             "matching_rows": result_count,
             "columns": list(filtered.columns),
             "sample": filtered.head(5).to_dict(orient="records"),
             "id_columns": id_columns,
+            "chart_target_column": chart_col,
+            "chart_counts": chart_counts,
         }
 
     elif operation == "value_counts":
@@ -102,6 +137,14 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
             result = group[agg_col].agg(agg_func)
 
         result = result.sort_values(ascending=False)
+        groups_count = len(result)
+
+        CHART_TOP_N = 15
+        if groups_count > 20:
+            chart_slice = result.head(CHART_TOP_N)
+            chart_results = {str(k): float(v) if isinstance(v, (int, float)) else str(v) for k, v in chart_slice.items()}
+        else:
+            chart_results = None
 
         return {
             "operation": "group_by_agg",
@@ -109,7 +152,8 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
             "agg_column": agg_col,
             "agg_func": agg_func,
             "results": {str(k): float(v) if isinstance(v, (int, float)) else str(v) for k, v in result.items()},
-            "groups_count": len(result),
+            "chart_results": chart_results,
+            "groups_count": groups_count,
             "id_columns": id_columns,
         }
 

@@ -9,14 +9,14 @@ from pydantic import BaseModel
 from google import genai
 
 from dataloader import load_data, describe_dataframe
-from query_planner import get_query_plan, get_summary
+from query_planner import get_query_plan, get_summary, _call_llm
 from query_executor import execute_plan
 from chart_generator import generate_chart
 
 _suggestions_cache = None
 
 # Load environment
-load_dotenv(dotenv_path=Path(__file__).parent / ".env")
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Load data once at startup — not on every request
@@ -27,9 +27,11 @@ data_description = describe_dataframe(df)
 app = FastAPI()
 
 # Allow React (running on a different port) to talk to this API
+_raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
+allowed_origins = [o.strip() for o in _raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +41,7 @@ app.add_middleware(
 class QuestionRequest(BaseModel):
     question: str
     chart_type: str | None = None
+    chart_theme: str = "light"
 
 # Response shape — what we send back
 class AnalysisResponse(BaseModel):
@@ -47,6 +50,7 @@ class AnalysisResponse(BaseModel):
     operation: str
     unsupported_reason: str | None = None
     usage: dict
+    model_used: str = "gemini"
 
 @app.get("/")
 def health_check():
@@ -64,8 +68,8 @@ def get_suggestions():
         return _suggestions_cache
 
     prompt = SUGGESTION_PROMPT.format(data_description=data_description)
-    resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-    raw = resp.text.strip()
+    resp, _provider = _call_llm(prompt, client)
+    raw = resp.text.strip() if _provider == "gemini" else resp.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").lstrip("json").strip()
     import json
@@ -77,7 +81,8 @@ def ask(request: QuestionRequest):
     # Step 1: question → query plan
     result = get_query_plan(request.question, data_description, client)
     plan = result["plan"]
-    usage = result["usage"]
+    plan_usage = result["usage"]
+    plan_model = result["model_used"]
 
     # Step 2: handle unsupported questions immediately
     if plan.get("operation") == "unsupported":
@@ -86,29 +91,40 @@ def ask(request: QuestionRequest):
             chart_base64=None,
             operation="unsupported",
             unsupported_reason=plan.get("reason"),
-            usage=usage
+            usage=plan_usage,
+            model_used=plan_model
         )
 
     # Step 3: execute the plan against real data
     exec_result = execute_plan(df, plan)
 
-    # Step 4: get plain-English summary (also capture usage from the second call)
-    summary = get_summary(request.question, exec_result, client)
+    # Step 4: get plain-English summary (also capture usage + model from the second call)
+    summary_result = get_summary(request.question, exec_result, client)
+    summary = summary_result["summary"]
+    summary_usage = summary_result["usage"]
+    summary_model = summary_result["model_used"]
 
-    # Step 5: generate chart and convert to base64 string
+    # Combine usage from both calls
+    combined_usage = {
+        "prompt_tokens": plan_usage["prompt_tokens"] + summary_usage["prompt_tokens"],
+        "response_tokens": plan_usage["response_tokens"] + summary_usage["response_tokens"],
+        "total_tokens": plan_usage["total_tokens"] + summary_usage["total_tokens"],
+    }
+    model_used = "groq" if (plan_model == "groq" or summary_model == "groq") else "gemini"
+
+    # Step 5: generate chart (in-memory, no file I/O)
     chart_base64 = None
-    try:
-        generate_chart(exec_result)
-        if os.path.exists("chart.png"):
-            with open("chart.png", "rb") as f:
-                chart_base64 = base64.b64encode(f.read()).decode("utf-8")
-    except Exception as e:
-        print(f"Chart generation error: {e}")
+    if exec_result.get("operation") != "unsupported":
+        try:
+            chart_base64 = generate_chart(exec_result, chart_type=request.chart_type, chart_theme=request.chart_theme)
+        except Exception as e:
+            print(f"Chart generation error: {e}")
 
     return AnalysisResponse(
         summary=summary,
         chart_base64=chart_base64,
         operation=plan.get("operation"),
         unsupported_reason=None,
-        usage=usage
+        usage=combined_usage,
+        model_used=model_used
     )

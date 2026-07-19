@@ -6,11 +6,11 @@ export async function fetchSuggestions() {
   return res.json();
 }
 
-export async function askQuestion(question, chartType) {
+export async function askQuestion(question, chartType, chartTheme) {
   const res = await fetch(`${BASE}/api/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, chart_type: chartType }),
+    body: JSON.stringify({ question, chart_type: chartType, chart_theme: chartTheme }),
   });
   if (!res.ok) throw new Error("Failed to get answer");
   return res.json();

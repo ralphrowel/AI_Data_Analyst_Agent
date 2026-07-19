@@ -10,7 +10,7 @@ from query_planner import get_query_plan, get_summary
 from query_executor import execute_plan
 from chart_generator import generate_chart
 
-load_dotenv(dotenv_path=Path(__file__).parent / ".env")
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 

@@ -24,6 +24,10 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("darkMode") === "true"
   );
+  const [activeModel, setActiveModel] = useState("gemini");
+  const [chartTheme, setChartTheme] = useState(
+    () => localStorage.getItem("darkMode") === "true" ? "dark" : "light"
+  );
 
   useEffect(() => {
     localStorage.setItem("darkMode", darkMode);
@@ -39,6 +43,7 @@ export default function App() {
     setCharts([]);
     setCurrentChartIndex(0);
     setTokenUsage({ prompt_tokens: 0, response_tokens: 0, total_tokens: 0 });
+    setActiveModel("gemini");
   }, []);
 
   useEffect(() => {
@@ -56,7 +61,22 @@ export default function App() {
       setIsStreaming(true);
 
       try {
-        const data = await askQuestion(question, chartType);
+        const data = await askQuestion(question, chartType, chartTheme);
+
+        const modelUsed = data.model_used || "gemini";
+        if (modelUsed === "groq" && activeModel === "gemini") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: ++messageId,
+              role: "system",
+              systemType: "model_switch",
+              text: "Gemini quota reached — switched to Groq for this response. Subsequent responses will continue using Groq unless the quota resets.",
+            },
+          ]);
+        }
+        setActiveModel(modelUsed);
+
         const assistantMsg = {
           id: ++messageId,
           role: "assistant",
@@ -67,10 +87,8 @@ export default function App() {
         };
         setMessages((prev) => [...prev, assistantMsg]);
 
-        if (data.chart_base64) {
-          setCharts((prev) => [...prev, data.chart_base64]);
-          setCurrentChartIndex(charts.length);
-        }
+        setCharts((prev) => [...prev, data.chart_base64 || null]);
+        setCurrentChartIndex(charts.length);
 
         if (data.usage) {
           setTokenUsage((prev) => ({
@@ -92,7 +110,7 @@ export default function App() {
       }
       setIsStreaming(false);
     },
-    [chartType, isStreaming, charts.length]
+    [chartType, isStreaming, charts.length, activeModel, chartTheme]
   );
 
   return (
@@ -114,6 +132,9 @@ export default function App() {
         onClearChat={handleClearChat}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
+        activeModel={activeModel}
+        chartTheme={chartTheme}
+        onChartThemeChange={setChartTheme}
       />
       </div>
       <div className="flex flex-1 min-h-0 relative z-[1]">

@@ -1,10 +1,9 @@
 import { useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 
-export default function Header({ chartType, chartEnabled, onChartTypeChange, onChartEnabledChange, onClearChat, darkMode, setDarkMode }) {
+export default function Header({ chartType, chartEnabled, onChartTypeChange, onChartEnabledChange, onClearChat, darkMode, setDarkMode, activeModel, chartTheme, onChartThemeChange }) {
   const [showUploadTooltip, setShowUploadTooltip] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
-  const [aiModel, setAiModel] = useState("gemini-2.5-flash");
   const options = [
     { label: "Auto", value: null },
     { label: "Bar", value: "bar" },
@@ -138,18 +137,23 @@ export default function Header({ chartType, chartEnabled, onChartTypeChange, onC
 
         <div className="w-px h-4 bg-surface-200 dark:bg-gray-700" />
 
-        <select
-          value={aiModel}
-          onChange={(e) => {
-            setAiModel(e.target.value);
-            setTimeout(() => setAiModel("gemini-2.5-flash"), 200);
-          }}
-          className="text-xs bg-surface-50 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-md px-2 py-1 text-surface-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent cursor-pointer"
+        <label className="flex items-center gap-1 text-xs text-surface-500 dark:text-gray-400 select-none">
+          <span>Graph Theme</span>
+          <select
+            value={chartTheme}
+            onChange={(e) => onChartThemeChange(e.target.value)}
+            className="text-xs bg-surface-50 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-md px-1.5 py-0.5 text-surface-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent cursor-pointer"
+          >
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+
+        <span
+          className="text-xs font-medium rounded-md px-2.5 py-1 select-none bg-surface-100 dark:bg-gray-800 text-surface-500 dark:text-gray-400 border border-surface-200 dark:border-gray-700"
         >
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-          <option value="gpt-4" disabled>GPT-4 (coming soon)</option>
-          <option value="claude-3" disabled>Claude 3 (coming soon)</option>
-        </select>
+          {activeModel === "gemini" ? "Gemini 2.5 Flash" : "Groq (fallback)"}
+        </span>
 
         <button
           onClick={handleClearClick}
