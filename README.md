@@ -49,32 +49,37 @@ If a question can't be answered with the available data, the agent honestly says
 
 ```
 Ai Data Analyst Agent/
-├── .env                  # GEMINI_API_KEY, GROQ_API_KEY, ALLOWED_ORIGINS — never committed
-├── api.py                # FastAPI entry point — POST /api/ask, GET /api/suggestions
-├── dataloader.py          # load_data(), describe_dataframe(), COLUMN_NOTES
-├── query_planner.py       # get_query_plan(), get_summary(), Gemini/Groq fallback logic
-├── query_executor.py      # Executes JSON plans safely against the DataFrame
-├── chart_generator.py     # Matplotlib chart generation + Auto chart-type heuristic
+├── backend/                      # Modular backend package
+│   ├── app/
+│   │   ├── main.py               # FastAPI application & CORS
+│   │   ├── config.py             # Centralized settings & data paths
+│   │   ├── api/                  # REST endpoints & Pydantic schemas
+│   │   │   ├── routes.py         # /api/ask, /api/suggestions
+│   │   │   └── schemas.py
+│   │   ├── agent/                # Router, Coordinator & Prompt orchestration
+│   │   ├── tools/                # Controlled Data, RAG & Chart tools
+│   │   │   ├── structured_tools.py
+│   │   │   ├── rag_tools.py
+│   │   │   └── chart_tool.py
+│   │   ├── rag/                  # Document indexer & vector retriever
+│   │   ├── memory/               # Multi-turn conversation state
+│   │   ├── data_engine/          # Loader & Profiler modules
+│   │   ├── llm/                  # Gemini & Groq fallback client
+│   │   └── legacy/               # Archived single-shot query planner & executor
+│   └── run_cli.py                # CLI runner harness
 ├── data/
-│   └── netflix_titles.csv
-└── frontend/
-    ├── src/
-    │   ├── api.js             # Fetch calls to FastAPI
-    │   └── components/
-    │       ├── App.jsx            # Root state, dark mode, active model tracking
-    │       ├── Header.jsx         # Model badge, dark mode + chart theme toggles
-    │       ├── ChatPanel.jsx / ChartPanel.jsx
-    │       ├── MessageBubble.jsx / SystemMessage.jsx
-    │       └── TokenUsageDisplay.jsx
+│   ├── raw/                      # Tabular datasets (netflix_titles.csv)
+│   └── knowledge/                # Unstructured documentation for RAG lookup
+├── docs/                         # System proposals & technical notes
+├── tests/                        # Tests and secondary datasets (sample_orders.csv)
+├── frontend/                     # React (Vite) + Tailwind CSS
+│   └── src/
+│       ├── api.js                # Fetch calls to FastAPI
+│       └── components/           # UI components
+├── .env                          # API keys & environment config
+├── api.py                        # Root backward-compatible server proxy
+└── requirements.txt
 ```
-
----
-
-## Status
-
-**Stages 1–9 complete** — full pipeline, chart rendering, real token usage tracking, dark mode, LLM fallback, and all known pre-deployment blockers resolved (CORS narrowed, chart generation moved off disk).
-
-**Next: Stage 10** — deploy React to Vercel, FastAPI to Render or Railway.
 
 ---
 
@@ -85,7 +90,7 @@ Ai Data Analyst Agent/
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -r requirements.txt
-uvicorn api:app --reload
+uvicorn backend.app.main:app --reload   # (or: uvicorn api:app --reload)
 
 # Frontend
 cd frontend

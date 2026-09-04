@@ -1,7 +1,7 @@
 import re
 import pandas as pd
 
-from data_profiler import has_comma_separated, has_number_with_unit, get_id_columns
+from backend.app.data_engine.profiler import has_comma_separated, has_number_with_unit, get_id_columns
 
 FREE_TEXT_COLUMNS = {"title", "description", "cast", "director"}
 HIGH_CARD_TEXT = {"duration", "date_added"}

@@ -1,23 +1,54 @@
+# Environment & Secrets
 .env
+.env.*
 *.env
+!.env.example
+
+# Virtual Environments
 .venv/
-*.venv
+venv/
+env/
+ENV/
+
+# Python Bytecode & Caches
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
 
-# Generated chart output
-chart.png
+# IDE & Editor Configurations
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# OS artifacts
+# OS Artifacts
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Log files
+# Logs
 *.log
+logs/
 
-# Test cache
-.pytest_cache/
-
-# Frontend build artifacts
+# Frontend Build & Dependencies
+node_modules/
 frontend/node_modules/
 frontend/dist/
+dist/
+.vite/
+
+# Generated Outputs
+chart.png
+backend/chart.png
+
+# Vector Store / Local DB (for upcoming RAG & DB testing)
+*.db
+*.sqlite
+*.sqlite3
+chroma/
+.chroma/
+faiss_index/

@@ -1,4 +1,6 @@
+from pathlib import Path
 import pandas as pd
+from backend.app.config import DEFAULT_DATASET_PATH
 
 
 def _parse_minutes(dur):
@@ -19,8 +21,10 @@ def _parse_seasons(dur):
     return pd.NA
 
 
-def load_data(csv_path: str) -> pd.DataFrame:
-    df = pd.read_csv(csv_path)
+def load_data(csv_path: str | Path | None = None) -> pd.DataFrame:
+    if csv_path is None:
+        csv_path = DEFAULT_DATASET_PATH
+    df = pd.read_csv(str(csv_path))
 
     df["duration_minutes"] = df.apply(
         lambda row: _parse_minutes(row["duration"]) if row["type"] == "Movie" else pd.NA,
@@ -65,6 +69,6 @@ def describe_dataframe(df: pd.DataFrame, sample_rows: int = 3) -> str:
 
 if __name__ == "__main__":
     import sys
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/netflix_titles.csv"
+    path = sys.argv[1] if len(sys.argv) > 1 else str(DEFAULT_DATASET_PATH)
     df = load_data(path)
     print(describe_dataframe(df))
