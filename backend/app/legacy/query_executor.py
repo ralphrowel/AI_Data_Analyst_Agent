@@ -126,9 +126,27 @@ def execute_plan(df: pd.DataFrame, plan: dict) -> dict:
         }
 
     elif operation == "group_by_agg":
-        target = plan["target_column"]
+        target = plan.get("target_column")
         agg_col = plan.get("agg_column") or target
         agg_func = plan.get("agg_func", "count")
+
+        if not target:
+            # Single column aggregation without grouping (e.g. overall average)
+            if agg_func in ("mean", "sum") and has_number_with_unit(filtered[agg_col]):
+                series = _extract_numeric_from_series(filtered[agg_col])
+                val = series.agg(agg_func)
+            else:
+                val = filtered[agg_col].agg(agg_func)
+            return {
+                "operation": "group_by_agg",
+                "target_column": agg_col,
+                "agg_column": agg_col,
+                "agg_func": agg_func,
+                "results": {agg_func: float(val) if isinstance(val, (int, float)) else str(val)},
+                "chart_results": None,
+                "chart_x_label": agg_col,
+                "chart_y_label": agg_func,
+            }
 
         group = filtered.groupby(target)
         if agg_func in ("mean", "sum") and has_number_with_unit(filtered[agg_col]):

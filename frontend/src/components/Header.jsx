@@ -1,8 +1,21 @@
 import { useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 
-export default function Header({ chartType, chartEnabled, onChartTypeChange, onChartEnabledChange, onClearChat, darkMode, setDarkMode, activeModel, chartTheme, onChartThemeChange }) {
-  const [showUploadTooltip, setShowUploadTooltip] = useState(false);
+export default function Header({
+  chartType,
+  chartEnabled,
+  onChartTypeChange,
+  onChartEnabledChange,
+  onClearChat,
+  darkMode,
+  setDarkMode,
+  activeModel,
+  selectedModel,
+  onSelectedModelChange,
+  chartTheme,
+  onChartThemeChange,
+  activeDatasetName,
+}) {
   const [showClearModal, setShowClearModal] = useState(false);
   const options = [
     { label: "Auto", value: null },
@@ -23,28 +36,14 @@ export default function Header({ chartType, chartEnabled, onChartTypeChange, onC
   return (
     <header className="flex items-center gap-4 px-4 py-2 border-b border-surface-200 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0">
       <div className="flex items-center shrink-0">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-l-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 border-r-0 text-surface-600 dark:text-gray-300 text-xs font-medium">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-200 text-xs font-medium select-none shadow-sm"
+          title="Active dataset locked to this chat void"
+        >
+          <svg className="w-3.5 h-3.5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
           </svg>
-          <span>netflix_titles.csv</span>
-        </div>
-        <div className="relative">
-          <button
-            onClick={() => setShowUploadTooltip((prev) => !prev)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-r-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-150 dark:hover:bg-gray-700 text-xs transition-colors cursor-pointer"
-            title="Upload Dataset"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            Upload
-          </button>
-          {showUploadTooltip && (
-            <div className="absolute top-full left-0 mt-1.5 px-3 py-1.5 bg-surface-800 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap z-50 pointer-events-none">
-              Coming soon — currently using netflix_titles.csv
-            </div>
-          )}
+          <span className="font-mono text-[11px] font-semibold">{activeDatasetName || "netflix_titles.csv"}</span>
         </div>
       </div>
 
@@ -56,7 +55,7 @@ export default function Header({ chartType, chartEnabled, onChartTypeChange, onC
           <input
             type="text"
             placeholder="Search chats..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-50 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-full text-surface-700 dark:text-gray-200 placeholder-surface-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-50 dark:bg-gray-950 border border-surface-200 dark:border-gray-700 rounded-full text-surface-700 dark:text-gray-200 placeholder-surface-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
           />
         </div>
       </div>
@@ -149,11 +148,27 @@ export default function Header({ chartType, chartEnabled, onChartTypeChange, onC
           </select>
         </label>
 
-        <span
-          className="text-xs font-medium rounded-md px-2.5 py-1 select-none bg-surface-100 dark:bg-gray-800 text-surface-500 dark:text-gray-400 border border-surface-200 dark:border-gray-700"
-        >
-          {activeModel === "gemini" ? "Gemini 2.5 Flash" : "Groq (fallback)"}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <label className="flex items-center gap-1 text-xs text-surface-500 dark:text-gray-400 select-none">
+            <span className="font-medium">Model</span>
+            <select
+              value={selectedModel}
+              onChange={(e) => onSelectedModelChange(e.target.value)}
+              className="text-xs bg-surface-50 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-md px-2 py-1 text-surface-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent cursor-pointer font-medium"
+            >
+              <option value="groq">Groq GPT-OSS 120B</option>
+              <option value="gemini">Gemini 2.5 Flash</option>
+            </select>
+          </label>
+          {activeModel && activeModel !== selectedModel && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+              title="Fell back to alternative model"
+            >
+              fallback: {activeModel === "groq" ? "Groq GPT-OSS 120B" : "Gemini 2.5 Flash"}
+            </span>
+          )}
+        </div>
 
         <button
           onClick={handleClearClick}

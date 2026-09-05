@@ -7,8 +7,8 @@ from backend.app.llm.client import call_llm, normalize_usage
 ALLOWED_OPERATIONS = ["filter", "value_counts", "group_by_agg", "sort_limit"]
 
 
-def _call_llm(prompt, client, model="gemini-2.5-flash"):
-    return call_llm(prompt, client, model=model)
+def _call_llm(prompt, client, model=None, provider=None):
+    return call_llm(prompt, client, model=model, provider=provider)
 
 
 def _strip_json_fences(raw_text):
@@ -62,16 +62,16 @@ Return ONLY the JSON object, nothing else.
 """
 
 
-def get_query_plan(question: str, data_description: str, client) -> dict:
+def get_query_plan(question: str, data_description: str, client, provider: str | None = None) -> dict:
     prompt = build_query_prompt(question, data_description)
-    response, provider = _call_llm(prompt, client)
+    response, provider_used = _call_llm(prompt, client, provider=provider)
 
-    raw_text = response.text.strip() if provider == "gemini" else response.choices[0].message.content.strip()
+    raw_text = response.text.strip() if provider_used == "gemini" else response.choices[0].message.content.strip()
     raw_text = _strip_json_fences(raw_text)
     plan = json.loads(raw_text)
-    usage = normalize_usage(response, provider)
+    usage = normalize_usage(response, provider_used)
 
-    return {"plan": plan, "usage": usage, "model_used": provider}
+    return {"plan": plan, "usage": usage, "model_used": provider_used}
 
 
 def build_summary_prompt(question: str, result: dict) -> str:
@@ -86,11 +86,11 @@ Keep the tone factual and concise.
 """
 
 
-def get_summary(question: str, result: dict, client) -> dict:
+def get_summary(question: str, result: dict, client, provider: str | None = None) -> dict:
     prompt = build_summary_prompt(question, result)
-    response, provider = _call_llm(prompt, client)
+    response, provider_used = _call_llm(prompt, client, provider=provider)
 
-    text = response.text.strip() if provider == "gemini" else response.choices[0].message.content.strip()
-    usage = normalize_usage(response, provider)
+    text = response.text.strip() if provider_used == "gemini" else response.choices[0].message.content.strip()
+    usage = normalize_usage(response, provider_used)
 
-    return {"summary": text, "usage": usage, "model_used": provider}
+    return {"summary": text, "usage": usage, "model_used": provider_used}

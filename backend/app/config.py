@@ -20,6 +20,11 @@ DEFAULT_DATASET_PATH = RAW_DATA_DIR / "netflix_titles.csv"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# LLM Providers & Models
+DEFAULT_LLM_PROVIDER = os.getenv("DEFAULT_LLM_PROVIDER", "groq").lower()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
 # CORS Origins
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
 ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]

@@ -26,15 +26,17 @@ def load_data(csv_path: str | Path | None = None) -> pd.DataFrame:
         csv_path = DEFAULT_DATASET_PATH
     df = pd.read_csv(str(csv_path))
 
-    df["duration_minutes"] = df.apply(
-        lambda row: _parse_minutes(row["duration"]) if row["type"] == "Movie" else pd.NA,
-        axis=1,
-    ).astype("Int64")
+    # Apply specialized numeric parsing if duration & type columns exist
+    if "duration" in df.columns and "type" in df.columns:
+        df["duration_minutes"] = df.apply(
+            lambda row: _parse_minutes(row["duration"]) if row["type"] == "Movie" else pd.NA,
+            axis=1,
+        ).astype("Int64")
 
-    df["duration_seasons"] = df.apply(
-        lambda row: _parse_seasons(row["duration"]) if row["type"] == "TV Show" else pd.NA,
-        axis=1,
-    ).astype("Int64")
+        df["duration_seasons"] = df.apply(
+            lambda row: _parse_seasons(row["duration"]) if row["type"] == "TV Show" else pd.NA,
+            axis=1,
+        ).astype("Int64")
 
     return df
 

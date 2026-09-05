@@ -1,0 +1,16 @@
+work_year,experience_level,employment_type,job_title,salary_in_usd,company_location,company_size
+2023,SE,FT,Data Engineer,160000,US,M
+2023,MI,FT,Data Analyst,95000,US,M
+2023,SE,FT,Machine Learning Engineer,210000,US,L
+2023,EX,FT,Data Science Manager,250000,US,L
+2023,EN,FT,Junior Data Analyst,65000,CA,S
+2023,SE,FT,Data Scientist,175000,US,M
+2023,MI,FT,Business Intelligence Analyst,90000,GB,M
+2023,SE,FT,Analytics Engineer,155000,US,M
+2023,EN,FT,Junior Data Scientist,75000,DE,M
+2022,SE,FT,Lead Data Analyst,125000,US,L
+2022,MI,FT,Data Analyst,80000,US,M
+2022,SE,FT,Data Architect,195000,US,L
+2022,EN,FT,Data Engineer,70000,US,M
+2022,SE,FT,Research Scientist,180000,US,L
+2022,MI,FT,Data Scientist,110000,FR,M
