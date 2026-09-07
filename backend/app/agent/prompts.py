@@ -113,6 +113,20 @@ TOOL SELECTION RULES:
 6. For questions requiring grouping by one column and aggregating another (e.g. 'average salary by job title'), use 'group_data'.
 7. If the user asks about dataset structure, row count, or available columns, use 'get_dataset_schema'.
 8. If the user asks about definitions or methodology documentation, use 'search_documents'.
+9. When the user asks for a chart, graph, line graph, or trend over time (e.g. 'create me a line graph with it', 'plot average seasons', 'chart by year'):
+   - Use 'group_data' grouping by a time/ordered column (like 'release_year' or 'date_added') or categorical column so that multiple data points can be plotted!
+   - Example: 'what are the average number of season per tv show create me a line graph with it' -> tool: 'group_data', parameters: {{"by_column": "release_year", "agg_column": "duration_seasons", "agg_func": "mean"}}.
+
+10. SPECIFIC ENTITY / CRITERIA SEARCH (e.g. 'How many titles are there from Wakanda?', 'Movies directed by Tarantino'):
+    - ALWAYS use 'filter_rows' with the relevant column (e.g. column='country', operator='contains', value='Wakanda').
+    - NEVER use 'get_unique_values' when checking for a specific named entity, country, person, or title.
+
+11. AMBIGUOUS, SUBJECTIVE, OR MISSING METRICS (e.g. 'best', 'worst', 'most popular', 'top rated', 'most successful'):
+    - First check the dataset schema to see if an empirical quality score, review rating, views, or popularity column exists.
+    - IMPORTANT NOTE: In catalog datasets like Netflix, the 'rating' column is a content maturity advisory (e.g. TV-MA, PG-13), NOT a quality or review score!
+    - If the user asks for a subjective quality ('best titles', 'worst movies', 'most popular') and the dataset DOES NOT have an empirical rating/score/popularity column:
+      * Choose 'unsupported' explaining clearly that the dataset does not contain quality scores, review ratings, or popularity metrics (clarifying that 'rating' is only content maturity), and suggest alternatives (e.g. by release year, runtime, or genre).
+      * Do NOT silently assume an arbitrary proxy (like runtime) as 'best' without user confirmation.
 
 {history_text}USER QUESTION:
 "{question}"
@@ -127,16 +141,31 @@ Return ONLY a valid JSON object with no markdown fences, backticks, or extra exp
 """
 
 
-def build_summary_prompt(question: str, tool_name: str, result: Any) -> str:
+def build_summary_prompt(
+    question: str,
+    tool_name: str,
+    result: Any,
+    assumption: Optional[str] = None,
+) -> str:
     """Prompt to generate a concise plain-English explanation of analysis results."""
+    assumption_instruction = ""
+    if assumption:
+        assumption_instruction = f"""
+IMPORTANT DISCLOSURE ON ASSUMPTIONS:
+An analytical proxy or assumption was used: "{assumption}"
+You MUST explicitly state this caveat upfront in your summary (e.g., clarify that the dataset does not measure quality/reviews/popularity, and explain what proxy metric was examined instead).
+"""
+
     return f"""You are a professional data analyst.
 The user asked: "{question}"
 
 The analysis executed the '{tool_name}' tool and produced this result:
 {result}
-
+{assumption_instruction}
 Write a concise, professional 2-3 sentence plain-English summary explaining what the result shows.
 Mention specific numbers, categories, or metrics where relevant.
+If the result has 0 records or matches (e.g. searching for an entity that is not in the data), clearly state that no records were found.
+If an assumption was made, disclose it transparently.
 Do not mention that an AI or tool was used. Maintain an objective, informative tone.
 """
 

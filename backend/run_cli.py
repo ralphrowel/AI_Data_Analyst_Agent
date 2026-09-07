@@ -49,5 +49,6 @@ print(f"Result: {result}")
 summary_res = get_summary(question, result, client)
 print(f"\nSummary:\n{summary_res['summary']}")
 
-chart_b64 = generate_chart(result)
+chart_res = generate_chart(result)
+chart_b64 = chart_res[0] if isinstance(chart_res, tuple) else chart_res
 print(f"\nChart generated: {'Yes (base64)' if chart_b64 else 'None'}")

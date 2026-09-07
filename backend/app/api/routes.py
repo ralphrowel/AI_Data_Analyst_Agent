@@ -13,7 +13,7 @@ from backend.app.api.schemas import (
 from backend.app.config import USE_LEGACY_AGENT, KNOWLEDGE_DIR
 from backend.app.agent.coordinator import default_coordinator
 from backend.app.rag.retriever import default_retriever
-from backend.app.tools.chart_tool import generate_chart
+from backend.app.tools.chart_tool import generate_chart, extract_chart_spec
 from backend.app.llm.client import get_gemini_client, call_llm
 from backend.app.legacy.query_planner import get_query_plan, get_summary
 from backend.app.legacy.query_executor import execute_plan
@@ -220,12 +220,18 @@ def ask(request: QuestionRequest):
 
         # Step 5: generate chart
         chart_base64 = None
+        chart_svg = None
+        chart_spec = None
         if exec_result.get("operation") != "unsupported":
             try:
-                chart_base64 = generate_chart(
+                chart_base64, chart_svg = generate_chart(
                     exec_result,
                     chart_type=request.chart_type,
                     chart_theme=request.chart_theme,
+                )
+                chart_spec = extract_chart_spec(
+                    exec_result,
+                    chart_type=request.chart_type,
                 )
             except Exception as e:
                 print(f"Chart generation error: {e}")
@@ -233,6 +239,8 @@ def ask(request: QuestionRequest):
         return AnalysisResponse(
             summary=summary,
             chart_base64=chart_base64,
+            chart_svg=chart_svg,
+            chart_spec=chart_spec,
             operation=plan.get("operation", "unknown"),
             unsupported_reason=None,
             usage=combined_usage,
@@ -251,6 +259,8 @@ def ask(request: QuestionRequest):
     return AnalysisResponse(
         summary=res.get("summary", ""),
         chart_base64=res.get("chart_base64"),
+        chart_svg=res.get("chart_svg"),
+        chart_spec=res.get("chart_spec"),
         operation=res.get("operation", "unknown"),
         unsupported_reason=res.get("unsupported_reason"),
         usage=res.get("usage", {}),

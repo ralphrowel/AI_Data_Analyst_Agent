@@ -13,6 +13,8 @@ class QuestionRequest(BaseModel):
 class AnalysisResponse(BaseModel):
     summary: str
     chart_base64: Optional[str] = None
+    chart_svg: Optional[str] = None
+    chart_spec: Optional[Dict[str, Any]] = None
     operation: str
     unsupported_reason: Optional[str] = None
     usage: Dict[str, Any]

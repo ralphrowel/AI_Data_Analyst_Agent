@@ -15,6 +15,7 @@ import ChartPanel from "./ChartPanel";
 import Header from "./Header";
 import NewChatModal from "./NewChatModal";
 import UploadModal from "./UploadModal";
+import HomePage from "./HomePage";
 
 
 let messageId = 0;
@@ -81,13 +82,9 @@ export default function App() {
     fetchSessions()
       .then((sessionList) => {
         setSessions(sessionList || []);
-        if (sessionList && sessionList.length > 0) {
-          const matched = sessionList.find(
-            (s) => s.session_id === localStorage.getItem("activeSessionId")
-          );
-          const chosenId = matched ? matched.session_id : sessionList[0].session_id;
-          setActiveSessionId(chosenId);
-          localStorage.setItem("activeSessionId", chosenId);
+        const savedId = localStorage.getItem("activeSessionId");
+        if (savedId && sessionList && sessionList.some((s) => s.session_id === savedId)) {
+          setActiveSessionId(savedId);
         } else {
           setActiveSessionId(null);
           localStorage.removeItem("activeSessionId");
@@ -109,10 +106,19 @@ export default function App() {
             text: turn.content,
             operation: turn.metadata?.operation,
             chart_base64: turn.metadata?.chart_base64,
+            chart_svg: turn.metadata?.chart_svg,
+            chart_spec: turn.metadata?.chart_spec,
           }));
           setMessages(restoredMessages);
+          const restoredCharts = restoredMessages
+            .filter((m) => m.chart_base64 || m.chart_svg)
+            .map((m) => ({ chart_base64: m.chart_base64, chart_svg: m.chart_svg }));
+          setCharts(restoredCharts);
+          setCurrentChartIndex(restoredCharts.length > 0 ? restoredCharts.length - 1 : 0);
         } else {
           setMessages([]);
+          setCharts([]);
+          setCurrentChartIndex(0);
         }
 
         if (detail.token_usage) {
@@ -134,10 +140,34 @@ export default function App() {
 
   const handleSelectSession = useCallback((sessionId) => {
     setActiveSessionId(sessionId);
-    localStorage.setItem("activeSessionId", sessionId);
+    if (sessionId) {
+      localStorage.setItem("activeSessionId", sessionId);
+    } else {
+      localStorage.removeItem("activeSessionId");
+      setMessages([]);
+      setSuggestions([]);
+    }
     setCharts([]);
     setCurrentChartIndex(0);
   }, []);
+
+  const handlePickDataset = useCallback(
+    async (datasetName) => {
+      const existing = sessions.find((s) => s.dataset_name === datasetName);
+      if (existing) {
+        handleSelectSession(existing.session_id);
+      } else {
+        try {
+          const newSession = await createSession(datasetName, `${datasetName} Workspace`);
+          setSessions((prev) => [newSession, ...prev]);
+          handleSelectSession(newSession.session_id);
+        } catch (err) {
+          console.error("Failed to start session with dataset:", err);
+        }
+      }
+    },
+    [sessions, handleSelectSession]
+  );
 
   const handleConfirmNewChat = useCallback(
     async ({ source, file, datasetName, title }) => {
@@ -237,11 +267,18 @@ export default function App() {
           operation: data.operation,
           unsupported_reason: data.unsupported_reason,
           chart_base64: data.chart_base64,
+          chart_svg: data.chart_svg,
+          chart_spec: data.chart_spec,
         };
         setMessages((prev) => [...prev, assistantMsg]);
 
-        setCharts((prev) => [...prev, data.chart_base64 || null]);
-        setCurrentChartIndex(charts.length);
+        if (data.chart_base64 || data.chart_svg) {
+          setCharts((prev) => {
+            const next = [...prev, { chart_base64: data.chart_base64, chart_svg: data.chart_svg }];
+            setCurrentChartIndex(next.length - 1);
+            return next;
+          });
+        }
 
         if (data.usage) {
           setTokenUsage((prev) => {
@@ -290,46 +327,61 @@ export default function App() {
         />
       </div>
       <div className="flex flex-col flex-1 min-w-0">
-        <div className="relative z-[2]">
-          <Header
-            chartType={chartType}
-            chartEnabled={chartEnabled}
-            onChartTypeChange={setChartType}
-            onChartEnabledChange={setChartEnabled}
-            onClearChat={handleClearChat}
+        {activeSessionId ? (
+          <>
+            <div className="relative z-[2]">
+              <Header
+                chartType={chartType}
+                chartEnabled={chartEnabled}
+                onChartTypeChange={setChartType}
+                onChartEnabledChange={setChartEnabled}
+                onClearChat={handleClearChat}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                activeModel={activeModel}
+                selectedModel={selectedModel}
+                onSelectedModelChange={handleModelChange}
+                chartTheme={chartTheme}
+                onChartThemeChange={setChartTheme}
+                activeDatasetName={activeDatasetName}
+                onOpenUpload={() => setShowUploadModal(true)}
+              />
+            </div>
+            <div className="flex flex-1 min-h-0 relative z-[1]">
+              <ChatPanel
+                messages={messages}
+                suggestions={suggestions}
+                isStreaming={isStreaming}
+                chartType={chartType}
+                chartEnabled={chartEnabled}
+                onChartTypeChange={setChartType}
+                onChartEnabledChange={setChartEnabled}
+                onSubmit={handleSubmit}
+                activeDatasetName={activeDatasetName}
+                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
+                onNewChat={() => setShowNewChatModal(true)}
+              />
+              {charts.length > 0 && (
+                <ChartPanel
+                  charts={charts}
+                  currentIndex={currentChartIndex}
+                  onIndexChange={setCurrentChartIndex}
+                />
+              )}
+            </div>
+          </>
+        ) : (
+          <HomePage
+            availableDatasets={availableDatasets}
+            sessions={sessions}
+            onSelectSession={handleSelectSession}
+            onPickDataset={handlePickDataset}
+            onNewChat={() => setShowNewChatModal(true)}
+            onOpenUpload={() => setShowUploadModal(true)}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
-            activeModel={activeModel}
-            selectedModel={selectedModel}
-            onSelectedModelChange={handleModelChange}
-            chartTheme={chartTheme}
-            onChartThemeChange={setChartTheme}
-            activeDatasetName={activeDatasetName}
-            onOpenUpload={() => setShowUploadModal(true)}
           />
-        </div>
-        <div className="flex flex-1 min-h-0 relative z-[1]">
-          <ChatPanel
-            messages={messages}
-            suggestions={suggestions}
-            isStreaming={isStreaming}
-            chartType={chartType}
-            chartEnabled={chartEnabled}
-            onChartTypeChange={setChartType}
-            onChartEnabledChange={setChartEnabled}
-            onSubmit={handleSubmit}
-            activeDatasetName={activeDatasetName}
-            datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
-            onNewChat={() => setShowNewChatModal(true)}
-          />
-          {charts.length > 0 && (
-            <ChartPanel
-              charts={charts}
-              currentIndex={currentChartIndex}
-              onIndexChange={setCurrentChartIndex}
-            />
-          )}
-        </div>
+        )}
       </div>
 
       <NewChatModal

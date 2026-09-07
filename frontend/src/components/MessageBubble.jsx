@@ -1,8 +1,12 @@
 import { useState } from "react";
+import ChartZoomModal from "./ChartZoomModal";
+import InteractiveChart from "./InteractiveChart";
 
 export default function MessageBubble({ message }) {
   const [copied, setCopied] = useState(false);
+  const [showZoom, setShowZoom] = useState(false);
   const isUser = message.role === "user";
+  const hasChart = Boolean(message.chart_svg || message.chart_base64 || message.chart_spec);
 
   const handleCopy = async () => {
     try {
@@ -17,7 +21,7 @@ export default function MessageBubble({ message }) {
     const rows = [
       ["Operation", message.operation || "N/A"],
       ["Summary", message.text],
-      ["Has Chart", message.chart_base64 ? "Yes" : "No"],
+      ["Has Chart", hasChart ? "Yes" : "No"],
     ];
     const csvContent = [
       headers.join(","),
@@ -68,16 +72,40 @@ export default function MessageBubble({ message }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
             </button>
+            {hasChart && (
+              <button
+                onClick={() => setShowZoom(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200/50 dark:hover:bg-gray-700/50"
+                title="Enlarge and zoom chart"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                </svg>
+                <span className="text-[11px]">Zoom</span>
+              </button>
+            )}
           </div>
         )}
-        {message.chart_base64 && (
-          <img
-            src={`data:image/png;base64,${message.chart_base64}`}
-            alt="Chart"
-            className="mt-3 rounded-lg w-full max-h-80 object-contain bg-white dark:bg-gray-800 border border-surface-200 dark:border-gray-700"
+
+        {/* Real Matplotlib Chart with interactive hover tooltips */}
+        {hasChart && (
+          <InteractiveChart
+            chartSvg={message.chart_svg}
+            chartBase64={message.chart_base64}
+            onZoom={() => setShowZoom(true)}
+            compact={true}
           />
         )}
       </div>
+
+      {showZoom && (
+        <ChartZoomModal
+          chartBase64={message.chart_base64}
+          chartSvg={message.chart_svg}
+          onClose={() => setShowZoom(false)}
+          title={message.chart_spec?.title || "Analysis Chart"}
+        />
+      )}
     </div>
   );
 }

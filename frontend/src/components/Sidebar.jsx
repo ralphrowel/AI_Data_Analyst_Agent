@@ -34,6 +34,24 @@ export default function Sidebar({
         </button>
       </div>
 
+      {/* Home Navigation */}
+      <div className="px-2 pt-2">
+        <button
+          onClick={() => onSelectSession && onSelectSession(null)}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+            activeSessionId === null
+              ? "bg-accent/15 dark:bg-accent/20 text-accent font-semibold ring-1 ring-accent/30"
+              : "text-surface-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-800"
+          } ${collapsed ? "justify-center px-0" : ""}`}
+          title="Home Overview (No chat selected)"
+        >
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+          </svg>
+          {!collapsed && <span>Home</span>}
+        </button>
+      </div>
+
       {/* New Chat Button */}
       <div className="p-2">
         <button

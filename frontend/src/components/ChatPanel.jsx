@@ -42,7 +42,7 @@ export default function ChatPanel({
         />
       ) : (
         <>
-          <MessageList messages={messages} />
+          <MessageList messages={messages} isStreaming={isStreaming} />
           <div className="px-6 py-4 max-w-2xl mx-auto w-full">
             <Toolbar
               chartType={chartType}

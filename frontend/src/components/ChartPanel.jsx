@@ -1,11 +1,18 @@
+import { useState } from "react";
+import ChartZoomModal from "./ChartZoomModal";
+import InteractiveChart from "./InteractiveChart";
+
 export default function ChartPanel({ charts, currentIndex, onIndexChange }) {
-  const chartData = charts[currentIndex];
-  const hasChart = Boolean(chartData);
+  const [showZoom, setShowZoom] = useState(false);
+  const currentItem = charts[currentIndex];
+  const chartBase64 = typeof currentItem === "string" ? currentItem : currentItem?.chart_base64 || currentItem?.base64;
+  const chartSvg = typeof currentItem === "object" ? currentItem?.chart_svg : null;
+  const hasChart = Boolean(chartBase64 || chartSvg);
 
   const handleDownload = () => {
-    if (!hasChart) return;
+    if (!chartBase64) return;
     const link = document.createElement("a");
-    link.href = `data:image/png;base64,${chartData}`;
+    link.href = `data:image/png;base64,${chartBase64}`;
     link.download = `chart_${currentIndex + 1}.png`;
     link.click();
   };
@@ -14,29 +21,55 @@ export default function ChartPanel({ charts, currentIndex, onIndexChange }) {
 
   return (
     <aside className="w-96 shrink-0 border-l border-surface-200 dark:border-gray-700 bg-surface-50 dark:bg-gray-900 flex flex-col">
-      <div className="p-4 border-b border-surface-200 dark:border-gray-700">
+      <div className="p-4 border-b border-surface-200 dark:border-gray-700 flex items-center justify-between">
         <h3 className="text-sm font-medium text-surface-600 dark:text-gray-300">
           Charts <span className="text-surface-400 dark:text-gray-500 font-normal">({chartCount})</span>
         </h3>
+        {hasChart && (
+          <button
+            onClick={() => setShowZoom(true)}
+            className="flex items-center gap-1 text-xs text-accent hover:underline cursor-pointer"
+            title="Enlarge chart"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+            </svg>
+            <span>Zoom</span>
+          </button>
+        )}
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
         {hasChart ? (
-          <>
-            <img
-              src={`data:image/png;base64,${chartData}`}
-              alt={`Chart ${currentIndex + 1}`}
-              className="max-w-full max-h-full object-contain rounded-lg bg-white dark:bg-gray-800 shadow-sm border border-surface-200 dark:border-gray-700"
+          <div className="w-full flex flex-col items-center">
+            <InteractiveChart
+              chartSvg={chartSvg}
+              chartBase64={chartBase64}
+              onZoom={() => setShowZoom(true)}
+              compact={true}
             />
-            <button
-              onClick={handleDownload}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs text-surface-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-lg hover:bg-surface-50 dark:hover:bg-gray-700 hover:text-surface-800 dark:hover:text-gray-100 transition-colors cursor-pointer shadow-sm"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              Download PNG
-            </button>
-          </>
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                onClick={() => setShowZoom(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-surface-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-lg hover:bg-surface-50 dark:hover:bg-gray-700 hover:text-surface-800 dark:hover:text-gray-100 transition-colors cursor-pointer shadow-sm"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                </svg>
+                <span>Zoom</span>
+              </button>
+              {chartBase64 && (
+                <button
+                  onClick={handleDownload}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-surface-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-surface-200 dark:border-gray-700 rounded-lg hover:bg-surface-50 dark:hover:bg-gray-700 hover:text-surface-800 dark:hover:text-gray-100 transition-colors cursor-pointer shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  <span>Download PNG</span>
+                </button>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-surface-400 dark:text-gray-500">
             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
@@ -61,6 +94,14 @@ export default function ChartPanel({ charts, currentIndex, onIndexChange }) {
             />
           ))}
         </div>
+      )}
+      {showZoom && hasChart && (
+        <ChartZoomModal
+          chartBase64={chartBase64}
+          chartSvg={chartSvg}
+          onClose={() => setShowZoom(false)}
+          title={`Chart ${currentIndex + 1} Preview`}
+        />
       )}
     </aside>
   );
