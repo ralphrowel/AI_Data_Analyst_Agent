@@ -14,6 +14,8 @@ import ChatPanel from "./ChatPanel";
 import ChartPanel from "./ChartPanel";
 import Header from "./Header";
 import NewChatModal from "./NewChatModal";
+import UploadModal from "./UploadModal";
+
 
 let messageId = 0;
 
@@ -32,7 +34,9 @@ export default function App() {
   );
   const [availableDatasets, setAvailableDatasets] = useState([]);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [messages, setMessages] = useState([]);
+
   const [charts, setCharts] = useState([]);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
@@ -301,6 +305,7 @@ export default function App() {
             chartTheme={chartTheme}
             onChartThemeChange={setChartTheme}
             activeDatasetName={activeDatasetName}
+            onOpenUpload={() => setShowUploadModal(true)}
           />
         </div>
         <div className="flex flex-1 min-h-0 relative z-[1]">
@@ -333,6 +338,18 @@ export default function App() {
         onClose={() => setShowNewChatModal(false)}
         onCreate={handleConfirmNewChat}
       />
+
+      <UploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUploadSuccess={() => {
+          loadDatasets();
+        }}
+        onStartNewChatWithDataset={(datasetName) => {
+          handleConfirmNewChat({ source: "storage", datasetName });
+        }}
+      />
     </div>
   );
 }
+

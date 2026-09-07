@@ -8,13 +8,19 @@ from backend.app.api.schemas import (
     SessionResponse,
     DatasetInfo,
     UploadDatasetRequest,
+    UploadResponse,
 )
+from backend.app.config import USE_LEGACY_AGENT, KNOWLEDGE_DIR
+from backend.app.agent.coordinator import default_coordinator
+from backend.app.rag.retriever import default_retriever
 from backend.app.tools.chart_tool import generate_chart
 from backend.app.llm.client import get_gemini_client, call_llm
 from backend.app.legacy.query_planner import get_query_plan, get_summary
 from backend.app.legacy.query_executor import execute_plan
 from backend.app.memory.session_store import default_session_store
 from backend.app.data_engine.dataset_manager import default_dataset_manager
+
+
 
 router = APIRouter()
 
@@ -42,33 +48,63 @@ def list_datasets():
     return default_dataset_manager.list_datasets()
 
 
-@router.post("/api/upload", response_model=DatasetInfo)
-def upload_dataset(req: UploadDatasetRequest):
-    """Upload a new CSV file from local device and save to data/raw/."""
+@router.post("/api/upload", response_model=UploadResponse)
+def upload_file(req: UploadDatasetRequest):
+    """Upload a CSV dataset to data/raw/ or a knowledge document to data/knowledge/."""
     filename = req.filename.strip()
-    if not filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are currently supported.")
+    lower_name = filename.lower()
 
-    target_path = default_dataset_manager.raw_data_dir / filename
-    try:
-        with open(target_path, "w", encoding="utf-8") as f:
-            f.write(req.content)
+    if lower_name.endswith(".csv"):
+        target_path = default_dataset_manager.raw_data_dir / filename
+        try:
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(req.content)
 
-        # Force refresh dataset cache
-        if filename in default_dataset_manager._cache:
-            del default_dataset_manager._cache[filename]
-        if filename in default_dataset_manager._desc_cache:
-            del default_dataset_manager._desc_cache[filename]
+            # Invalidate caches so newly uploaded dataset is available immediately
+            if filename in default_dataset_manager._cache:
+                del default_dataset_manager._cache[filename]
+            if filename in default_dataset_manager._desc_cache:
+                del default_dataset_manager._desc_cache[filename]
 
-        df = default_dataset_manager.get_dataset(filename)
-        return {
-            "name": filename,
-            "rows": len(df),
-            "columns": len(df.columns),
-            "size_bytes": target_path.stat().st_size,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process uploaded file: {e}")
+            df = default_dataset_manager.get_dataset(filename)
+            return {
+                "name": filename,
+                "rows": len(df),
+                "columns": len(df.columns),
+                "size_bytes": target_path.stat().st_size,
+                "type": "dataset",
+                "message": f"Dataset '{filename}' successfully saved ({len(df)} rows, {len(df.columns)} columns).",
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to process CSV upload: {e}")
+
+    elif lower_name.endswith((".md", ".txt")):
+        target_path = KNOWLEDGE_DIR / filename
+        try:
+            KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(req.content)
+
+            # Auto-trigger RAG indexing upon upload!
+            default_retriever.refresh()
+
+            return {
+                "name": filename,
+                "rows": 0,
+                "columns": 0,
+                "size_bytes": target_path.stat().st_size,
+                "type": "knowledge",
+                "message": f"Knowledge document '{filename}' successfully indexed for RAG.",
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to process knowledge upload: {e}")
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file format. Please upload CSV datasets (.csv) or knowledge documents (.md, .txt).",
+        )
+
 
 
 # --- Sessions Endpoints ---
@@ -131,74 +167,93 @@ def get_suggestions(provider: Optional[str] = None, session_id: Optional[str] = 
 
 @router.post("/api/ask", response_model=AnalysisResponse)
 def ask(request: QuestionRequest):
-    # Retrieve the session and its isolated dataset
-    session = default_session_store.get_session(request.session_id)
-    df = session.df
-    data_description = session.data_description
+    # Safety feature flag: fallback to legacy agent if explicitly enabled in .env
+    if USE_LEGACY_AGENT:
+        session = default_session_store.get_session(request.session_id)
+        df = session.df
+        data_description = session.data_description
 
-    # Record user message in session history
-    default_session_store.add_turn(session.session_id, "user", request.question)
+        default_session_store.add_turn(session.session_id, "user", request.question)
 
-    # Step 1: question -> query plan
-    result = get_query_plan(request.question, data_description, client, provider=request.provider)
-    plan = result["plan"]
-    plan_usage = result["usage"]
-    plan_model = result["model_used"]
+        # Step 1: question -> query plan
+        result = get_query_plan(request.question, data_description, client, provider=request.provider)
+        plan = result["plan"]
+        plan_usage = result["usage"]
+        plan_model = result["model_used"]
 
-    # Step 2: handle unsupported questions immediately
-    if plan.get("operation") == "unsupported":
-        reason = plan.get("reason", "This question cannot be answered with the available data.")
-        default_session_store.add_turn(session.session_id, "assistant", reason, {"operation": "unsupported"})
+        # Step 2: handle unsupported questions immediately
+        if plan.get("operation") == "unsupported":
+            reason = plan.get("reason", "This question cannot be answered with the available data.")
+            default_session_store.add_turn(session.session_id, "assistant", reason, {"operation": "unsupported"})
+            return AnalysisResponse(
+                summary=reason,
+                chart_base64=None,
+                operation="unsupported",
+                unsupported_reason=plan.get("reason"),
+                usage=plan_usage,
+                model_used=plan_model,
+            )
+
+        # Step 3: execute the plan against the session's specific data
+        exec_result = execute_plan(df, plan)
+
+        # Step 4: get plain-English summary
+        summary_result = get_summary(request.question, exec_result, client, provider=request.provider)
+        summary = summary_result["summary"]
+        summary_usage = summary_result["usage"]
+        summary_model = summary_result["model_used"]
+
+        # Combine usage from both calls
+        combined_usage = {
+            "prompt_tokens": plan_usage["prompt_tokens"] + summary_usage["prompt_tokens"],
+            "response_tokens": plan_usage["response_tokens"] + summary_usage["response_tokens"],
+            "total_tokens": plan_usage["total_tokens"] + summary_usage["total_tokens"],
+        }
+        model_used = "groq" if (plan_model == "groq" or summary_model == "groq") else "gemini"
+
+        # Update session token accumulation & record assistant turn
+        default_session_store.update_tokens(session.session_id, combined_usage, model_used)
+        default_session_store.add_turn(session.session_id, "assistant", summary, {
+            "operation": plan.get("operation", "unknown"),
+            "model_used": model_used,
+        })
+
+        # Step 5: generate chart
+        chart_base64 = None
+        if exec_result.get("operation") != "unsupported":
+            try:
+                chart_base64 = generate_chart(
+                    exec_result,
+                    chart_type=request.chart_type,
+                    chart_theme=request.chart_theme,
+                )
+            except Exception as e:
+                print(f"Chart generation error: {e}")
+
         return AnalysisResponse(
-            summary=reason,
-            chart_base64=None,
-            operation="unsupported",
-            unsupported_reason=plan.get("reason"),
-            usage=plan_usage,
-            model_used=plan_model,
+            summary=summary,
+            chart_base64=chart_base64,
+            operation=plan.get("operation", "unknown"),
+            unsupported_reason=None,
+            usage=combined_usage,
+            model_used=model_used,
         )
 
-    # Step 3: execute the plan against the session's specific data
-    exec_result = execute_plan(df, plan)
-
-    # Step 4: get plain-English summary
-    summary_result = get_summary(request.question, exec_result, client, provider=request.provider)
-    summary = summary_result["summary"]
-    summary_usage = summary_result["usage"]
-    summary_model = summary_result["model_used"]
-
-    # Combine usage from both calls
-    combined_usage = {
-        "prompt_tokens": plan_usage["prompt_tokens"] + summary_usage["prompt_tokens"],
-        "response_tokens": plan_usage["response_tokens"] + summary_usage["response_tokens"],
-        "total_tokens": plan_usage["total_tokens"] + summary_usage["total_tokens"],
-    }
-    model_used = "groq" if (plan_model == "groq" or summary_model == "groq") else "gemini"
-
-    # Update session token accumulation & record assistant turn
-    default_session_store.update_tokens(session.session_id, combined_usage, model_used)
-    default_session_store.add_turn(session.session_id, "assistant", summary, {
-        "operation": plan.get("operation", "unknown"),
-        "model_used": model_used,
-    })
-
-    # Step 5: generate chart
-    chart_base64 = None
-    if exec_result.get("operation") != "unsupported":
-        try:
-            chart_base64 = generate_chart(
-                exec_result,
-                chart_type=request.chart_type,
-                chart_theme=request.chart_theme,
-            )
-        except Exception as e:
-            print(f"Chart generation error: {e}")
+    # Modern Agent Coordinator pipeline (Step 7)
+    res = default_coordinator.process_query(
+        session_id=request.session_id,
+        question=request.question,
+        provider=request.provider,
+        chart_type=request.chart_type,
+        chart_theme=request.chart_theme,
+    )
 
     return AnalysisResponse(
-        summary=summary,
-        chart_base64=chart_base64,
-        operation=plan.get("operation", "unknown"),
-        unsupported_reason=None,
-        usage=combined_usage,
-        model_used=model_used,
+        summary=res.get("summary", ""),
+        chart_base64=res.get("chart_base64"),
+        operation=res.get("operation", "unknown"),
+        unsupported_reason=res.get("unsupported_reason"),
+        usage=res.get("usage", {}),
+        model_used=res.get("model_used", "gemini"),
     )
+

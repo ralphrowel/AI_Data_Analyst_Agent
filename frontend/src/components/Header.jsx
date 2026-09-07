@@ -15,6 +15,7 @@ export default function Header({
   chartTheme,
   onChartThemeChange,
   activeDatasetName,
+  onOpenUpload,
 }) {
   const [showClearModal, setShowClearModal] = useState(false);
   const options = [
@@ -35,9 +36,9 @@ export default function Header({
 
   return (
     <header className="flex items-center gap-4 px-4 py-2 border-b border-surface-200 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0">
-      <div className="flex items-center shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         <div
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-200 text-xs font-medium select-none shadow-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-200 text-xs font-medium select-none shadow-xs"
           title="Active dataset locked to this chat void"
         >
           <svg className="w-3.5 h-3.5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -45,7 +46,20 @@ export default function Header({
           </svg>
           <span className="font-mono text-[11px] font-semibold">{activeDatasetName || "netflix_titles.csv"}</span>
         </div>
+
+        <button
+          type="button"
+          onClick={onOpenUpload}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-100 dark:bg-gray-800 hover:bg-surface-200 dark:hover:bg-gray-700 border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-200 text-xs font-medium transition-colors cursor-pointer shadow-xs"
+          title="Upload new CSV dataset or knowledge document"
+        >
+          <svg className="w-3.5 h-3.5 text-surface-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          <span>Upload</span>
+        </button>
       </div>
+
 
       <div className="flex-1 flex justify-center">
         <div className="relative w-full max-w-md">

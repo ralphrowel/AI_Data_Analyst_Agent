@@ -294,8 +294,14 @@ class AgentCoordinator:
             "summary": summary_text,
             "chart_base64": chart_base64,
             "operation": operation,
+            "unsupported_reason": None,
             "result": serializable_result,
             "usage": usage_total,
             "model_used": model_used,
             "route": route,
         }
+
+
+# Global singleton coordinator instance
+default_coordinator = AgentCoordinator()
+

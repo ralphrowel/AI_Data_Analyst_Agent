@@ -43,3 +43,13 @@ class DatasetInfo(BaseModel):
 class UploadDatasetRequest(BaseModel):
     filename: str
     content: str
+
+
+class UploadResponse(BaseModel):
+    name: str
+    rows: int = 0
+    columns: int = 0
+    size_bytes: int = 0
+    type: str = "dataset"  # "dataset" | "knowledge"
+    message: Optional[str] = None
+

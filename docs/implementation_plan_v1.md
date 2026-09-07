@@ -102,29 +102,39 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 
 ---
 
-### [Current Task] Step 7 — Switch API Route from Legacy to Agent Coordinator
+### [Completed] Step 7 — Switch API Route from Legacy to Agent Coordinator
 - **Goal:** `/api/ask` serves answers via the modern `AgentCoordinator` pipeline instead of the legacy `query_planner.py`.
-
-- **What will be built:**
-  - `routes.py`:
-    - Refactor `/api/ask` to call `coordinator.process_query()`.
-    - Add safety feature flag `USE_LEGACY_AGENT=false` in `.env` so you can revert instantly if needed.
-- **Verification:** Run the full frontend and ask complex queries; verify answers, token displays, and charts continue functioning without regression.
+- **Implemented:**
+  - `config.py`: Added `USE_LEGACY_AGENT` feature flag (defaults to `False`) for immediate zero-downtime fallback capability.
+  - `coordinator.py`: Added `unsupported_reason: None` and exported `default_coordinator` singleton.
+  - `routes.py`: Refactored `POST /api/ask` to dispatch directly into `default_coordinator.process_query()`.
+  - Verified: `test_api_step7.py` via FastAPI `TestClient` confirmed:
+    1. Structured queries generate exact groupings, summary text, and base64 chart renderings.
+    2. RAG queries retrieve data dictionary knowledge and return domain definitions.
+    3. Unsupported queries cleanly return HTTP 200 with `operation: unsupported`.
+    4. Frontend builds cleanly with zero errors.
 
 ---
 
-### [Planned] Step 8 — File Upload UI, Hardening & Polish
+### [Completed] Step 8 — File Upload UI, Hardening & Polish
 - **Goal:** Allow users to upload new CSV datasets and unstructured documents directly from the UI.
-- **What will be built:**
-  - `POST /api/upload`: Handles file uploads into `data/raw/` (for CSVs) and `data/knowledge/` (for text/markdown).
-  - Frontend Upload Modal: Drag-and-drop file upload linked to the Header "Upload" button and "+ New Chat" flow.
-  - Auto-trigger dynamic dataset description and RAG indexing upon upload.
-  - Full end-to-end regression testing and cleanup of scratch scripts.
+- **Implemented:**
+  - `routes.py`: Upgraded `POST /api/upload` to support:
+    - `.csv` datasets: stored in `data/raw/`, auto-clears cache, validates rows and columns, and returns dataset stats.
+    - `.md` / `.txt` knowledge documents: stored in `data/knowledge/`, auto-triggers vector index refresh via `default_retriever.refresh()`.
+  - `UploadModal.jsx`: Modern drag-and-drop modal with file detection, format validation, progress state, and instant "Start Chat with this Dataset" transition.
+  - `Header.jsx`: Added accessible "Upload" button with icon next to the active dataset badge.
+  - `App.jsx`: Fully wired upload modal, state lifecycle, and dataset reloading.
+  - Verified: `test_step8_hardening.py` confirmed:
+    1. CSV upload saves, discovers rows/columns, and enables new chat workspace creation.
+    2. Markdown knowledge upload saves, auto-triggers vector indexing, and is immediately retrievable via vector similarity search.
+    3. Frontend builds with 0 errors.
 
 ---
 
-### [Planned] Step 9 — Supabase Auth & Per-Client Token Quotas (Option 1)
+### [Current Task] Step 9 — Supabase Auth & Per-Client Token Quotas (Option 1)
 - **Goal:** Authenticate users with Google 1-Click / Email OTP via Supabase, scope chat workspaces & datasets privately per user, and enforce a daily per-client token allowance (e.g. 50,000 tokens/day) to prevent server quota exhaustion.
+
 - **What will be built:**
   - **Backend Auth Dependency:**
     - `backend/app/auth/supabase_auth.py`: FastAPI dependency validating Supabase JWT tokens (`get_current_user`).
