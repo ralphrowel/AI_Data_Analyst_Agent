@@ -18,6 +18,7 @@ from backend.app.tools.structured_tools import (
     get_unique_values,
 )
 from backend.app.tools.chart_tool import generate_chart
+from backend.app.tools.rag_tools import search_documents
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +191,27 @@ TOOL_SCHEMAS = {
             "required": [],
         },
     },
+    "search_documents": {
+        "name": "search_documents",
+        "description": (
+            "Search unstructured documentation, data dictionaries, and notes for definitions, "
+            "domain context, column meanings, or methodology."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Natural language search query.",
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "Number of relevant passages to retrieve (default 3).",
+                },
+            },
+            "required": ["query"],
+        },
+    },
 }
 
 
@@ -208,7 +230,9 @@ TOOL_FUNCTIONS = {
     "sort_data": sort_data,
     "get_unique_values": get_unique_values,
     "generate_chart": generate_chart,
+    "search_documents": search_documents,
 }
+
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 | Step 6 | RAG Layer (Unstructured Data)   | Planned      | Text chunking + vector embeddings + semantic retrieval for markdown/text knowledge docs.             |
 | Step 7 | API Route Switchover            | Planned      | Connect /api/ask to AgentCoordinator behind a safety feature flag.                                   |
 | Step 8 | File Upload UI & Polish         | Planned      | Drag-and-drop CSV and doc uploads, dataset management UI, and final hardening.                       |
+| Step 9 | Supabase Auth & Client Quotas   | Planned      | Google 1-Click + Email login, per-user private sessions & datasets, and daily token budget metering.  |
 
 ---
 
@@ -54,46 +55,56 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 
 ---
 
-### [Current Task] Step 4 — Wire Coordinator to Actually Execute Tools
+### [Completed] Step 4 — Wire Coordinator to Actually Execute Tools
 - **Goal:** Transform `AgentCoordinator` from a skeleton into an active execution engine.
-- **What will be built:**
-  - `coordinator.py`:
-    1. Look up session from `SessionStore` to get the session's isolated `df`.
-    2. Obtain route classification from Router.
-    3. For `"structured"`: Invoke LLM with tool schemas from `default_registry` -> parse tool calls -> execute tool functions against `session.df` -> return analysis result.
-    4. For `"rag"`: Call `search_documents()`.
-    5. For `"hybrid"`: Execute structured analysis + retrieve relevant documentation and synthesize a single answer.
-    6. Record conversation turn and token usage into `SessionStore`.
-  - `prompts.py`: Tool-calling system prompt and coordinator guidance.
-- **Verification:** Direct test script invoking `coordinator.process_query(session_id, question)` on a session and receiving real computed results.
+- **Implemented:**
+  - `coordinator.py`: Full execution pipeline orchestrating Router classification, Session isolation, LLM tool selection via `build_tool_selection_prompt()`, deterministic function execution against `session.df`, plain-English summarization, automatic chart payload resolution (`generate_chart`), multi-turn memory recording, and cumulative token tracking.
+  - `prompts.py`: Robust prompt builders for tool selection with strict JSON output rules, analytical summary generation, RAG document synthesis, and hybrid reasoning.
+  - `structured_tools.py`: Added resilient case-insensitive column resolution (`_resolve_column`), multi-operator support (`eq`, `contains`, `gt`, `gte`, `lt`, `lte`), numeric aggregation safety, and NaN-safe JSON serialization.
+  - `registry_setup.py`: Registered 8 tools (including `search_documents`) with full JSON schemas.
+  - Verified: `test_coordinator_step4.py` confirmed 4 comprehensive tests passing:
+    1. Netflix Session structured query ("Top 5 countries") computed exact figures (`US: 2818, India: 972...`), generated chart, and recorded 2073 tokens.
+    2. Tech Salaries Session query ("Most common job titles") executed against `tech_salaries.csv` with zero cross-talk, isolated tokens (1650 tokens).
+    3. Unsupported query correctly triggered `operation: unsupported` with clean explanatory reason.
+    4. Schema inquiry executed `get_dataset_schema`, accurately detailing 8,807 rows and 14 columns.
 
 ---
 
-### [Planned] Step 5 — Upgrade Router to LLM Classification
+### [Completed] Step 5 — Upgrade Router to LLM Classification
 - **Goal:** Intelligent intent routing that decides whether a query needs structured calculations, document lookup, or both.
-- **What will be built:**
-  - `router.py`:
-    - Add `llm_route()` using a concise system prompt (`ROUTER_SYSTEM_PROMPT`) returning `{"route": "structured" | "rag" | "hybrid"}`.
-    - Keep fast regex/keyword pattern matching as zero-cost fallback when offline or to conserve quota.
-- **Verification:** Diverse query test suite verifying:
-  - "Top 5 oldest movies" -> `structured`
-  - "What does TV-MA mean?" -> `rag`
-  - "List all TV-MA shows and explain why they received this rating" -> `hybrid`
+- **Implemented:**
+  - `router.py`: `QueryRouter` upgraded with dual-mode classification (`llm` and `heuristic`):
+    - `llm_route()`: Calls LLM with `build_router_prompt()` returning verified JSON `{ "route": "structured" | "rag" | "hybrid" }`.
+    - `heuristic_route()`: Robust zero-cost keyword and pattern matching fallback.
+  - `prompts.py`: Added `build_router_prompt()` with multi-turn conversation context threading and intent guidance.
+  - `coordinator.py`: Passes active LLM `provider` down into `router.route()` for seamless provider consistency.
+  - Verified: `test_router_step5.py` confirmed 100% accuracy across:
+    - Structured queries ("Top 5 oldest movies", "Average duration of movies") -> `structured`
+    - RAG queries ("What does TV-MA mean?", "Explain criteria for PG-13") -> `rag`
+    - Hybrid queries ("List all TV-MA shows and explain why they received this rating") -> `hybrid`
+    - Multi-turn context queries correctly inheriting intent.
+    - Zero-cost heuristic fallback tested offline.
 
 ---
 
-### [Planned] Step 6 — Build RAG Layer (Embeddings + Vector Search)
+### [Completed] Step 6 — Build RAG Layer (Embeddings + Vector Search)
 - **Goal:** Enable the agent to answer questions from unstructured knowledge documents (markdown/text/data dictionaries).
-- **What will be built:**
-  - `indexer.py`: Document ingestion pipeline that scans `data/knowledge/`, chunks documents into ~300-token passages, and generates vector embeddings.
-  - `retriever.py`: In-memory cosine similarity search over chunk vectors.
-  - `rag_tools.py`: Connects `search_documents(query)` tool to the retriever and registers it in `default_registry`.
-- **Verification:** Query `search_documents("content rating criteria")` returns relevant excerpts with similarity scores.
+- **Implemented:**
+  - `indexer.py`: Scans `data/knowledge/`, parses markdown & text documents, generates structured `DocumentChunk` passages with titles, and builds normalized TF-IDF vector representations with sublinear scaling.
+  - `retriever.py`: `DocumentRetriever` computes in-memory cosine similarity over chunk vectors using numpy dot-product scoring, ranking passages with confidence scores.
+  - `rag_tools.py`: `search_documents(query, top_k)` connected directly to `default_retriever` and registered in `default_registry`.
+  - `tools/__init__.py`: Auto-initializes and registers all structured and RAG tools on module import.
+  - Verified: `test_rag_step6.py` confirmed 4 comprehensive tests passing:
+    1. Document indexer loaded 2 documents, chunked 5 passages, and built a vocabulary of 183 terms.
+    2. Vector search matched relevant excerpts for "content rating criteria", "duration splitting", and "unique identifier".
+    3. `search_documents` registered tool executed cleanly with similarity scores.
+    4. End-to-end `AgentCoordinator.process_query()` on a RAG question routed to `rag`, executed `search_documents`, and synthesized an accurate factual answer.
 
 ---
 
-### [Planned] Step 7 — Switch API Route from Legacy to Agent Coordinator
+### [Current Task] Step 7 — Switch API Route from Legacy to Agent Coordinator
 - **Goal:** `/api/ask` serves answers via the modern `AgentCoordinator` pipeline instead of the legacy `query_planner.py`.
+
 - **What will be built:**
   - `routes.py`:
     - Refactor `/api/ask` to call `coordinator.process_query()`.
@@ -109,3 +120,26 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
   - Frontend Upload Modal: Drag-and-drop file upload linked to the Header "Upload" button and "+ New Chat" flow.
   - Auto-trigger dynamic dataset description and RAG indexing upon upload.
   - Full end-to-end regression testing and cleanup of scratch scripts.
+
+---
+
+### [Planned] Step 9 — Supabase Auth & Per-Client Token Quotas (Option 1)
+- **Goal:** Authenticate users with Google 1-Click / Email OTP via Supabase, scope chat workspaces & datasets privately per user, and enforce a daily per-client token allowance (e.g. 50,000 tokens/day) to prevent server quota exhaustion.
+- **What will be built:**
+  - **Backend Auth Dependency:**
+    - `backend/app/auth/supabase_auth.py`: FastAPI dependency validating Supabase JWT tokens (`get_current_user`).
+    - Scope `SessionStore`: Associate every `ChatSession` with `user_id`; `GET /api/sessions` filters strictly by the authenticated `user_id`.
+    - Private dataset storage: Isolate user-uploaded datasets under `data/uploads/{user_id}/`.
+  - **Token Metering & Quota Guard:**
+    - Track `tokens_used_today` per `user_id`.
+    - Reject queries with HTTP 429 ("Daily free token budget reached. Resets at midnight UTC.") before invoking Groq/Gemini if budget is exceeded.
+    - Increment user's token usage atomically upon successful LLM response.
+  - **Frontend Integration:**
+    - Install `@supabase/supabase-js`.
+    - Add Login / Sign-up modal with 1-Click "Sign in with Google" and Email Magic Link.
+    - Header User Profile badge showing current user email, sign-out button, and remaining daily token allowance progress bar.
+- **Verification:**
+  - Test sign-in for User A and User B.
+  - Confirm User A cannot see User B's sessions or uploaded CSV files.
+  - Confirm User A's token usage only depletes User A's daily quota, leaving User B unaffected.
+

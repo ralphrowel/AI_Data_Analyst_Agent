@@ -13,9 +13,8 @@ export default function Sidebar({
 }) {
   return (
     <aside
-      className={`${
-        collapsed ? "w-14" : "w-64"
-      } shrink-0 border-r border-surface-200 dark:border-gray-700 bg-surface-100 dark:bg-gray-950 flex flex-col transition-all duration-200 h-full select-none`}
+      className={`${collapsed ? "w-14" : "w-64"
+        } shrink-0 border-r border-surface-200 dark:border-gray-700 bg-surface-100 dark:bg-gray-950 flex flex-col transition-all duration-200 h-full select-none`}
     >
       {/* Header */}
       <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} p-3 border-b border-surface-200 dark:border-gray-700`}>
@@ -39,9 +38,8 @@ export default function Sidebar({
       <div className="p-2">
         <button
           onClick={onNewChat}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-accent text-white hover:opacity-90 shadow-sm transition-all cursor-pointer ${
-            collapsed ? "justify-center px-0" : ""
-          }`}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-accent text-white hover:opacity-90 shadow-sm transition-all cursor-pointer ${collapsed ? "justify-center px-0" : ""
+            }`}
           title="Start a new chat workspace"
         >
           <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -64,11 +62,10 @@ export default function Sidebar({
             <div
               key={s.session_id}
               onClick={() => onSelectSession && onSelectSession(s.session_id)}
-              className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${
-                isActive
+              className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${isActive
                   ? "bg-accent/15 dark:bg-accent/20 text-accent font-medium ring-1 ring-accent/30"
                   : "text-surface-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-800"
-              } ${collapsed ? "justify-center px-0" : ""}`}
+                } ${collapsed ? "justify-center px-0" : ""}`}
               title={collapsed ? `${s.title} (${s.dataset_name})` : undefined}
             >
               <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

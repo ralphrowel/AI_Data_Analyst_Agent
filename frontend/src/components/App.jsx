@@ -54,8 +54,8 @@ export default function App() {
     () => localStorage.getItem("darkMode") === "true" ? "dark" : "light"
   );
 
-  const activeSession = sessions.find((s) => s.session_id === activeSessionId) || sessions[0];
-  const activeDatasetName = activeSession?.dataset_name || "netflix_titles.csv";
+  const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
+  const activeDatasetName = activeSession?.dataset_name || null;
 
   // Dark mode effect
   useEffect(() => {
@@ -65,6 +65,7 @@ export default function App() {
     } else {
       document.documentElement.classList.remove("dark");
     }
+    setChartTheme(darkMode ? "dark" : "light");
   }, [darkMode]);
 
   // Initial load: fetch datasets and sessions
@@ -75,14 +76,17 @@ export default function App() {
 
     fetchSessions()
       .then((sessionList) => {
-        setSessions(sessionList);
-        if (sessionList.length > 0) {
+        setSessions(sessionList || []);
+        if (sessionList && sessionList.length > 0) {
           const matched = sessionList.find(
             (s) => s.session_id === localStorage.getItem("activeSessionId")
           );
           const chosenId = matched ? matched.session_id : sessionList[0].session_id;
           setActiveSessionId(chosenId);
           localStorage.setItem("activeSessionId", chosenId);
+        } else {
+          setActiveSessionId(null);
+          localStorage.removeItem("activeSessionId");
         }
       })
       .catch(() => {});
@@ -117,11 +121,11 @@ export default function App() {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     fetchSuggestions(activeSessionId)
       .then((suggs) => setSuggestions(suggs))
-      .catch(() => {});
+      .catch(() => { });
   }, [activeSessionId]);
 
   const handleSelectSession = useCallback((sessionId) => {
@@ -249,7 +253,7 @@ export default function App() {
         }
 
         // Refresh sessions list to display updated message count and title
-        fetchSessions().then((list) => setSessions(list)).catch(() => {});
+        fetchSessions().then((list) => setSessions(list)).catch(() => { });
       } catch {
         setMessages((prev) => [
           ...prev,
