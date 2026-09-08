@@ -22,6 +22,7 @@ class ChatSession:
         self.dataset_name = dataset_name
         self.created_at = created_at or datetime.now(timezone.utc).isoformat()
         self.history: List[Dict[str, Any]] = []
+        self.widgets: List[Dict[str, Any]] = []
         self.token_usage: Dict[str, int] = {
             "prompt_tokens": 0,
             "response_tokens": 0,
@@ -42,14 +43,26 @@ class ChatSession:
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize session metadata."""
+        last_preview = ""
+        if self.history:
+            for turn in reversed(self.history):
+                if turn.get("role") == "user":
+                    last_preview = str(turn.get("content", ""))[:90]
+                    break
+            if not last_preview and self.history:
+                last_preview = str(self.history[-1].get("content", ""))[:90]
+
         return {
             "session_id": self.session_id,
             "title": self.title,
             "dataset_name": self.dataset_name,
             "created_at": self.created_at,
             "message_count": len(self.history),
+            "widget_count": len(self.widgets),
             "token_usage": self.token_usage,
+            "last_message": last_preview,
         }
+
 
 
 class SessionStore:
@@ -57,16 +70,14 @@ class SessionStore:
 
     def __init__(self):
         self._sessions: Dict[str, ChatSession] = {}
-        # Ensure a default session is available immediately
-        self.ensure_default_session()
 
     def ensure_default_session(self) -> ChatSession:
-        """Create or return the default initial session."""
+        """Create or return a default session if needed as fallback."""
         default_id = "default_session"
         if default_id not in self._sessions:
             session = ChatSession(
                 session_id=default_id,
-                title="Netflix Analysis",
+                title="Default Workspace",
                 dataset_name=DEFAULT_DATASET_PATH.name,
             )
             self._sessions[default_id] = session
@@ -79,7 +90,7 @@ class SessionStore:
     ) -> ChatSession:
         """Create a new isolated session attached to a dataset."""
         session_id = str(uuid.uuid4())
-        chosen_dataset = dataset_name or DEFAULT_DATASET_PATH.name
+        chosen_dataset = dataset_name or (DEFAULT_DATASET_PATH.name if DEFAULT_DATASET_PATH.exists() else "dataset.csv")
         chosen_title = title or f"Analysis of {chosen_dataset.replace('.csv', '').replace('_', ' ').title()}"
 
         session = ChatSession(
@@ -91,9 +102,9 @@ class SessionStore:
         return session
 
     def get_session(self, session_id: Optional[str]) -> Optional[ChatSession]:
-        """Fetch a session by ID, defaulting to the initial session if missing."""
+        """Fetch a session by ID."""
         if not session_id or session_id not in self._sessions:
-            return self.ensure_default_session()
+            return None
         return self._sessions.get(session_id)
 
     def list_sessions(self) -> List[Dict[str, Any]]:
@@ -104,9 +115,6 @@ class SessionStore:
         """Delete a chat session."""
         if session_id in self._sessions:
             del self._sessions[session_id]
-            # If no sessions remain, regenerate default
-            if not self._sessions:
-                self.ensure_default_session()
             return True
         return False
 
@@ -158,9 +166,40 @@ class SessionStore:
         else:
             session.token_usage["gemini_tokens"] += call_total
 
+    def get_widgets(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get all dashboard widgets for a session."""
+        session = self.get_session(session_id)
+        return session.widgets if session else []
+
+    def add_widget(self, session_id: str, widget: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Add a widget to a session."""
+        session = self.get_session(session_id)
+        if not session:
+            return None
+        session.widgets.append(widget)
+        return widget
+
+    def delete_widget(self, session_id: str, widget_id: str) -> bool:
+        """Delete a widget by ID from a session."""
+        session = self.get_session(session_id)
+        if not session:
+            return False
+        initial_len = len(session.widgets)
+        session.widgets = [w for w in session.widgets if w.get("id") != widget_id]
+        return len(session.widgets) < initial_len
+
+    def set_widgets(self, session_id: str, widgets: List[Dict[str, Any]]) -> bool:
+        """Replace all widgets for a session."""
+        session = self.get_session(session_id)
+        if not session:
+            return False
+        session.widgets = widgets
+        return True
+
 
 # Global singleton instance
 default_session_store = SessionStore()
+
 
 # Backward compatibility alias
 SessionMemory = SessionStore

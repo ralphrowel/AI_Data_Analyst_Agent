@@ -1,54 +1,131 @@
-# Environment & Secrets
+# ==============================================================================
+# Environment Variables & Secrets
+# ==============================================================================
 .env
 .env.*
 *.env
 !.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
+# ==============================================================================
 # Virtual Environments
+# ==============================================================================
 .venv/
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
-# Python Bytecode & Caches
+# ==============================================================================
+# Python Bytecode, Caches & Packaging
+# ==============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Linting Caches
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .mypy_cache/
+.ruff_cache/
+.cache/
 
-# IDE & Editor Configurations
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS Artifacts
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Logs
-*.log
-logs/
-
-# Frontend Build & Dependencies
+# ==============================================================================
+# Frontend (Node, Vite & Build Artifacts)
+# ==============================================================================
 node_modules/
 frontend/node_modules/
 frontend/dist/
-dist/
+frontend/dist-ssr/
+frontend/.vite/
 .vite/
+.turbo/
 
-# Generated Outputs
+# Node logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==============================================================================
+# IDE & Editor Configurations
+# ==============================================================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# Operating System Artifacts
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# ==============================================================================
+# Logs & Temporary Files
+# ==============================================================================
+*.log
+logs/
+*.tmp
+*.temp
+
+# ==============================================================================
+# Generated Chart Artifacts
+# ==============================================================================
 chart.png
+chart.svg
 backend/chart.png
+backend/chart.svg
 
-# Vector Store / Local DB (for upcoming RAG & DB testing)
+# ==============================================================================
+# Local Databases, Vector Stores & Index Caches
+# ==============================================================================
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 chroma/
 .chroma/
 faiss_index/
+lancedb/
+.lancedb/

@@ -72,7 +72,7 @@ function AgentStatusIndicator() {
   );
 }
 
-export default function MessageList({ messages, isStreaming }) {
+export default function MessageList({ messages, isStreaming, onPinToDashboard }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -86,9 +86,14 @@ export default function MessageList({ messages, isStreaming }) {
           msg.operation === "unsupported" || msg.role === "system" ? (
             <SystemMessage key={msg.id} message={msg} />
           ) : (
-            <MessageBubble key={msg.id} message={msg} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onPinToDashboard={onPinToDashboard}
+            />
           )
         )}
+
         {isStreaming && <AgentStatusIndicator />}
         <div ref={bottomRef} />
       </div>

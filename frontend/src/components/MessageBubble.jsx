@@ -2,7 +2,7 @@ import { useState } from "react";
 import ChartZoomModal from "./ChartZoomModal";
 import InteractiveChart from "./InteractiveChart";
 
-export default function MessageBubble({ message }) {
+export default function MessageBubble({ message, onPinToDashboard }) {
   const [copied, setCopied] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
   const isUser = message.role === "user";
@@ -73,19 +73,36 @@ export default function MessageBubble({ message }) {
               </svg>
             </button>
             {hasChart && (
-              <button
-                onClick={() => setShowZoom(true)}
-                className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200/50 dark:hover:bg-gray-700/50"
-                title="Enlarge and zoom chart"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
-                </svg>
-                <span className="text-[11px]">Zoom</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowZoom(true)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200/50 dark:hover:bg-gray-700/50"
+                  title="Enlarge and zoom chart"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                  </svg>
+                  <span className="text-[11px]">Zoom</span>
+                </button>
+                {onPinToDashboard && (
+                  <button
+                    onClick={() => {
+                      onPinToDashboard(message);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer text-surface-500 dark:text-gray-400 hover:text-accent dark:hover:text-accent hover:bg-surface-200/50 dark:hover:bg-gray-700/50"
+                    title="Pin this chart to live Dashboard"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
+                    </svg>
+                    <span className="text-[11px]">Pin</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
+
 
         {/* Real Matplotlib Chart with interactive hover tooltips */}
         {hasChart && (

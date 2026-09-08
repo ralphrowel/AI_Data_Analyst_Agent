@@ -18,9 +18,18 @@ export default function Sidebar({
     >
       {/* Header */}
       <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} p-3 border-b border-surface-200 dark:border-gray-700`}>
-        {!collapsed && (
+        {!collapsed ? (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-surface-800 dark:text-gray-100 tracking-tight">Workspaces</span>
+            <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white font-bold text-[10px] tracking-wider shadow-xs">
+              V
+            </div>
+            <span className="text-sm font-bold text-surface-900 dark:text-gray-100 tracking-tight">
+              Visiq
+            </span>
+          </div>
+        ) : (
+          <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white font-bold text-xs shadow-xs mb-1">
+            V
           </div>
         )}
         <button

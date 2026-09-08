@@ -9,10 +9,17 @@ from backend.app.api.schemas import (
     DatasetInfo,
     UploadDatasetRequest,
     UploadResponse,
+    UpdateDatasetRequest,
+    AddRowRequest,
+    CreateWidgetRequest,
+    PinWidgetRequest,
+    RecentGraphInfo,
 )
 from backend.app.config import USE_LEGACY_AGENT, KNOWLEDGE_DIR
 from backend.app.agent.coordinator import default_coordinator
+from backend.app.agent.widget_engine import default_widget_engine
 from backend.app.rag.retriever import default_retriever
+
 from backend.app.tools.chart_tool import generate_chart, extract_chart_spec
 from backend.app.llm.client import get_gemini_client, call_llm
 from backend.app.legacy.query_planner import get_query_plan, get_summary
@@ -37,7 +44,7 @@ Dataset:
 
 @router.get("/")
 def health_check():
-    return {"status": "AI Data Analyst API is running", "architecture": "modular"}
+    return {"status": "Visiq AI Data Analyst API is running", "architecture": "modular"}
 
 
 # --- Datasets Endpoints ---
@@ -67,8 +74,15 @@ def upload_file(req: UploadDatasetRequest):
                 del default_dataset_manager._desc_cache[filename]
 
             df = default_dataset_manager.get_dataset(filename)
+            default_dataset_manager.log_activity(
+                filename,
+                "upload",
+                f"Uploaded {filename} ({len(df):,} rows, {len(df.columns)} cols)",
+                {"rows": len(df), "columns": len(df.columns)},
+            )
             return {
                 "name": filename,
+                "filename": filename,
                 "rows": len(df),
                 "columns": len(df.columns),
                 "size_bytes": target_path.stat().st_size,
@@ -104,6 +118,69 @@ def upload_file(req: UploadDatasetRequest):
             status_code=400,
             detail="Unsupported file format. Please upload CSV datasets (.csv) or knowledge documents (.md, .txt).",
         )
+
+
+@router.get("/api/datasets/{name}/rows")
+def get_dataset_rows(
+    name: str,
+    page: int = 1,
+    page_size: int = 50,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_order: str = "asc",
+):
+    """Retrieve paginated rows, search filtering, and column metadata for a dataset."""
+    try:
+        data = default_dataset_manager.get_rows_paginated(
+            name=name,
+            page=page,
+            page_size=page_size,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch dataset rows: {e}")
+
+
+@router.post("/api/datasets/{name}/update")
+def update_dataset_cells(name: str, req: UpdateDatasetRequest):
+    """Update cell values in the dataset and sync with disk and LLM descriptions."""
+    try:
+        raw_updates = [u.model_dump() if hasattr(u, "model_dump") else u.dict() for u in req.updates]
+        result = default_dataset_manager.update_cells(name, raw_updates)
+        # Invalidate suggestions cache if any so fresh queries can be suggested
+        if name in _suggestions_cache:
+            del _suggestions_cache[name]
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to update dataset: {e}")
+
+
+@router.post("/api/datasets/{name}/rows/add")
+def add_dataset_row(name: str, req: AddRowRequest):
+    """Append a new row to the dataset."""
+    try:
+        result = default_dataset_manager.add_row(name, req.row_data)
+        if name in _suggestions_cache:
+            del _suggestions_cache[name]
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to add row: {e}")
+
+
+@router.delete("/api/datasets/{name}/rows/{row_index}")
+def delete_dataset_row(name: str, row_index: int):
+    """Delete a row by index from the dataset."""
+    try:
+        result = default_dataset_manager.delete_row(name, row_index)
+        if name in _suggestions_cache:
+            del _suggestions_cache[name]
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to delete row: {e}")
+
 
 
 
@@ -145,7 +222,147 @@ def delete_session(session_id: str):
     return {"deleted": True, "session_id": session_id}
 
 
+# --- Dashboard Widgets Endpoints ---
+
+@router.get("/api/sessions/{session_id}/widgets")
+def list_session_widgets(session_id: str):
+    """Retrieve all dashboard widgets for a session."""
+    session = default_session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return default_session_store.get_widgets(session_id)
+
+
+@router.post("/api/sessions/{session_id}/widgets")
+def create_session_widget(session_id: str, req: CreateWidgetRequest):
+    """Compile a user prompt into a live widget and attach it to the session dashboard."""
+    session = default_session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        widget = default_widget_engine.create_widget_from_prompt(
+            session=session,
+            prompt=req.prompt,
+            chart_type=req.chart_type,
+            chart_theme=req.chart_theme,
+            provider=req.provider,
+        )
+        return widget
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create widget: {e}")
+
+
+@router.post("/api/sessions/{session_id}/widgets/pin")
+def pin_session_widget(session_id: str, req: PinWidgetRequest):
+    """Pin an existing visual insight from conversation to the dashboard."""
+    session = default_session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        widget = default_widget_engine.create_widget_from_chat(
+            session=session,
+            title=req.title,
+            prompt=req.prompt,
+            chart_base64=req.chart_base64,
+            chart_svg=req.chart_svg,
+            chart_spec=req.chart_spec,
+            operation=req.operation,
+            chart_type=req.chart_type,
+        )
+        return widget
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to pin widget: {e}")
+
+
+@router.post("/api/sessions/{session_id}/widgets/recompute")
+def recompute_session_widgets(session_id: str, chart_theme: str = "light"):
+    """Recompute all widgets against updated session.df with ZERO AI calls."""
+    session = default_session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        updated = default_widget_engine.recompute_widgets(session, chart_theme=chart_theme)
+        return updated
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to recompute widgets: {e}")
+
+
+@router.delete("/api/sessions/{session_id}/widgets/{widget_id}")
+def delete_session_widget(session_id: str, widget_id: str):
+    """Delete a dashboard widget."""
+    success = default_session_store.delete_widget(session_id, widget_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Widget not found")
+    return {"deleted": True, "widget_id": widget_id}
+
+
+@router.get("/api/recent-graphs", response_model=List[RecentGraphInfo])
+def get_recent_graphs(limit: int = 8):
+    """Retrieve recent graphs and visual charts created across workspaces."""
+    graphs = []
+    seen_charts = set()
+
+    for session in reversed(list(default_session_store._sessions.values())):
+        # Check pinned widgets
+        for w in reversed(session.widgets):
+            c_svg = w.get("chart_svg")
+            c_b64 = w.get("chart_base64")
+            key = (session.session_id, (c_svg or c_b64 or "")[:40])
+            if (c_svg or c_b64) and key not in seen_charts:
+                seen_charts.add(key)
+                graphs.append({
+                    "session_id": session.session_id,
+                    "session_title": session.title,
+                    "dataset_name": session.dataset_name,
+                    "prompt": w.get("title") or w.get("prompt") or "Pinned Insight",
+                    "chart_base64": c_b64,
+                    "chart_svg": c_svg,
+                    "chart_type": w.get("chart_type") or w.get("operation") or "chart",
+                    "created_at": w.get("created_at") or session.created_at,
+                })
+                if len(graphs) >= limit:
+                    return graphs
+
+        # Check session turns
+        history = session.history
+        for i, turn in enumerate(history):
+            meta = turn.get("metadata") or {}
+            c_svg = meta.get("chart_svg")
+            c_b64 = meta.get("chart_base64")
+            if c_svg or c_b64:
+                key = (session.session_id, (c_svg or c_b64 or "")[:40])
+                if key not in seen_charts:
+                    seen_charts.add(key)
+                    prompt = "Visual Insight"
+                    if i > 0 and history[i - 1].get("role") == "user":
+                        prompt = history[i - 1].get("content", "")
+                    graphs.append({
+                        "session_id": session.session_id,
+                        "session_title": session.title,
+                        "dataset_name": session.dataset_name,
+                        "prompt": prompt[:70],
+                        "chart_base64": c_b64,
+                        "chart_svg": c_svg,
+                        "chart_type": meta.get("operation", "chart"),
+                        "created_at": session.created_at,
+                    })
+                    if len(graphs) >= limit:
+                        return graphs
+
+    return graphs
+
+
+@router.get("/api/dataset-changes")
+def get_dataset_changes():
+    """Retrieve recent dataset changes, modifications, and uploads."""
+    return default_dataset_manager.get_activity_log()
+
+
 # --- Analytics & Question Answering ---
+
 
 @router.get("/api/suggestions")
 def get_suggestions(provider: Optional[str] = None, session_id: Optional[str] = None):
@@ -155,14 +372,28 @@ def get_suggestions(provider: Optional[str] = None, session_id: Optional[str] = 
     if dataset_name in _suggestions_cache:
         return _suggestions_cache[dataset_name]
 
-    desc = session.data_description if session else default_dataset_manager.get_dataset_description(dataset_name)
-    prompt = SUGGESTION_PROMPT.format(data_description=desc)
-    resp, provider_used = call_llm(prompt, client, provider=provider)
-    raw = resp.text.strip() if provider_used == "gemini" else resp.choices[0].message.content.strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`").lstrip("json").strip()
-    _suggestions_cache[dataset_name] = json.loads(raw)
-    return _suggestions_cache[dataset_name]
+    try:
+        desc = session.data_description if session else default_dataset_manager.get_dataset_description(dataset_name)
+        prompt = SUGGESTION_PROMPT.format(data_description=desc)
+        resp, provider_used = call_llm(prompt, client, provider=provider)
+        raw = resp.text.strip() if provider_used == "gemini" else resp.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`").lstrip("json").strip()
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and len(parsed) > 0:
+            _suggestions_cache[dataset_name] = parsed
+            return _suggestions_cache[dataset_name]
+    except Exception:
+        pass
+
+    fallback = [
+        "How many Movies vs TV Shows are there?",
+        "What are the top 5 countries by number of titles?",
+        "How many titles were released each year from 2015 to 2020?",
+        "Which genres are the most common in the dataset?",
+    ]
+    return fallback
+
 
 
 @router.post("/api/ask", response_model=AnalysisResponse)

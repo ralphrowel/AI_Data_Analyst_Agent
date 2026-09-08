@@ -8,14 +8,17 @@ import {
   fetchSessionDetails,
   deleteSession,
   uploadDataset,
+  pinWidgetToSession,
 } from "../api";
 import Sidebar from "./Sidebar";
 import ChatPanel from "./ChatPanel";
 import ChartPanel from "./ChartPanel";
 import Header from "./Header";
+import SpreadsheetPanel from "./SpreadsheetPanel";
+import DashboardPanel from "./DashboardPanel";
 import NewChatModal from "./NewChatModal";
-import UploadModal from "./UploadModal";
 import HomePage from "./HomePage";
+
 
 
 let messageId = 0;
@@ -30,12 +33,10 @@ const DEFAULT_TOKEN_USAGE = {
 
 export default function App() {
   const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(
-    () => localStorage.getItem("activeSessionId") || null
-  );
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeTab, setActiveTab] = useState("chat");
   const [availableDatasets, setAvailableDatasets] = useState([]);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [messages, setMessages] = useState([]);
 
   const [charts, setCharts] = useState([]);
@@ -73,25 +74,24 @@ export default function App() {
     setChartTheme(darkMode ? "dark" : "light");
   }, [darkMode]);
 
-  // Initial load: fetch datasets and sessions
-  useEffect(() => {
+  const loadDatasets = useCallback(() => {
     fetchDatasets()
       .then((data) => setAvailableDatasets(data))
       .catch(() => {});
+  }, []);
+
+  // Initial load: fetch datasets and sessions (always default to Home panel)
+  useEffect(() => {
+    loadDatasets();
 
     fetchSessions()
       .then((sessionList) => {
         setSessions(sessionList || []);
-        const savedId = localStorage.getItem("activeSessionId");
-        if (savedId && sessionList && sessionList.some((s) => s.session_id === savedId)) {
-          setActiveSessionId(savedId);
-        } else {
-          setActiveSessionId(null);
-          localStorage.removeItem("activeSessionId");
-        }
+        setActiveSessionId(null);
+        localStorage.removeItem("activeSessionId");
       })
       .catch(() => {});
-  }, []);
+  }, [loadDatasets]);
 
   // When activeSessionId changes, load its details, history, and suggestions
   useEffect(() => {
@@ -140,6 +140,7 @@ export default function App() {
 
   const handleSelectSession = useCallback((sessionId) => {
     setActiveSessionId(sessionId);
+    setActiveTab("chat");
     if (sessionId) {
       localStorage.setItem("activeSessionId", sessionId);
     } else {
@@ -151,39 +152,32 @@ export default function App() {
     setCurrentChartIndex(0);
   }, []);
 
-  const handlePickDataset = useCallback(
-    async (datasetName) => {
-      const existing = sessions.find((s) => s.dataset_name === datasetName);
-      if (existing) {
-        handleSelectSession(existing.session_id);
-      } else {
-        try {
-          const newSession = await createSession(datasetName, `${datasetName} Workspace`);
-          setSessions((prev) => [newSession, ...prev]);
-          handleSelectSession(newSession.session_id);
-        } catch (err) {
-          console.error("Failed to start session with dataset:", err);
-        }
-      }
-    },
-    [sessions, handleSelectSession]
-  );
-
   const handleConfirmNewChat = useCallback(
-    async ({ source, file, datasetName, title }) => {
+    async ({ file, datasetName, title }) => {
       try {
         let targetDataset = datasetName;
-        if (source === "device" && file) {
+        if (file) {
           const fileContent = await file.text();
           const uploadRes = await uploadDataset(file.name, fileContent);
-          targetDataset = uploadRes.filename;
+          targetDataset = uploadRes.name || uploadRes.filename || file.name;
           const updatedDatasets = await fetchDatasets();
           setAvailableDatasets(updatedDatasets);
         }
 
-        const newSession = await createSession(targetDataset, title);
+        if (!targetDataset) {
+          alert("Please select a valid CSV file.");
+          return;
+        }
+
+        const fallbackTitle = `${targetDataset
+          .replace(/\.[^/.]+$/, "")
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase())} Workspace`;
+
+        const newSession = await createSession(targetDataset, title || fallbackTitle);
         setSessions((prev) => [newSession, ...prev]);
         setActiveSessionId(newSession.session_id);
+        setActiveTab("chat");
         localStorage.setItem("activeSessionId", newSession.session_id);
         setMessages([]);
         setCharts([]);
@@ -228,6 +222,25 @@ export default function App() {
     setTokenUsage(cleared);
     setActiveModel(selectedModel);
   }, [selectedModel]);
+
+  const handlePinToDashboard = useCallback(
+    async (msg) => {
+      if (!activeSessionId) return;
+      try {
+        await pinWidgetToSession(activeSessionId, {
+          title: msg.text ? msg.text.slice(0, 48) + "..." : "Pinned Chart",
+          prompt: msg.text ? msg.text.slice(0, 100) : "Pinned from chat",
+          chart_base64: msg.chart_base64,
+          chart_svg: msg.chart_svg,
+          chart_spec: msg.chart_spec,
+          operation: msg.operation,
+        });
+      } catch (err) {
+        console.error("Failed to pin widget:", err);
+      }
+    },
+    [activeSessionId]
+  );
 
   const handleSubmit = useCallback(
     async (question) => {
@@ -331,6 +344,8 @@ export default function App() {
           <>
             <div className="relative z-[2]">
               <Header
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
                 chartType={chartType}
                 chartEnabled={chartEnabled}
                 onChartTypeChange={setChartType}
@@ -344,62 +359,68 @@ export default function App() {
                 chartTheme={chartTheme}
                 onChartThemeChange={setChartTheme}
                 activeDatasetName={activeDatasetName}
-                onOpenUpload={() => setShowUploadModal(true)}
               />
             </div>
-            <div className="flex flex-1 min-h-0 relative z-[1]">
-              <ChatPanel
-                messages={messages}
-                suggestions={suggestions}
-                isStreaming={isStreaming}
-                chartType={chartType}
-                chartEnabled={chartEnabled}
-                onChartTypeChange={setChartType}
-                onChartEnabledChange={setChartEnabled}
-                onSubmit={handleSubmit}
-                activeDatasetName={activeDatasetName}
-                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
-                onNewChat={() => setShowNewChatModal(true)}
-              />
-              {charts.length > 0 && (
-                <ChartPanel
-                  charts={charts}
-                  currentIndex={currentChartIndex}
-                  onIndexChange={setCurrentChartIndex}
+            {activeTab === "chat" ? (
+              <div className="flex flex-1 min-h-0 relative z-[1]">
+                <ChatPanel
+                  messages={messages}
+                  suggestions={suggestions}
+                  isStreaming={isStreaming}
+                  chartType={chartType}
+                  chartEnabled={chartEnabled}
+                  onChartTypeChange={setChartType}
+                  onChartEnabledChange={setChartEnabled}
+                  onSubmit={handleSubmit}
+                  activeDatasetName={activeDatasetName}
+                  datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
+                  onNewChat={() => setShowNewChatModal(true)}
+                  onPinToDashboard={handlePinToDashboard}
                 />
-              )}
-            </div>
+                {charts.length > 0 && (
+                  <ChartPanel
+                    charts={charts}
+                    currentIndex={currentChartIndex}
+                    onIndexChange={setCurrentChartIndex}
+                  />
+                )}
+              </div>
+            ) : activeTab === "spreadsheet" ? (
+              <SpreadsheetPanel
+                datasetName={activeDatasetName}
+                onDatasetUpdated={() => {
+                  loadDatasets();
+                }}
+              />
+            ) : (
+              <DashboardPanel
+                sessionId={activeSessionId}
+                datasetName={activeDatasetName}
+                chartTheme={chartTheme}
+                selectedModel={selectedModel}
+              />
+            )}
+
           </>
         ) : (
           <HomePage
-            availableDatasets={availableDatasets}
             sessions={sessions}
+            availableDatasets={availableDatasets}
             onSelectSession={handleSelectSession}
-            onPickDataset={handlePickDataset}
             onNewChat={() => setShowNewChatModal(true)}
-            onOpenUpload={() => setShowUploadModal(true)}
+            onDeleteSession={handleDeleteSession}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
+            selectedModel={selectedModel}
+            onRefreshData={loadDatasets}
           />
         )}
       </div>
 
       <NewChatModal
         isOpen={showNewChatModal}
-        availableDatasets={availableDatasets}
         onClose={() => setShowNewChatModal(false)}
         onCreate={handleConfirmNewChat}
-      />
-
-      <UploadModal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        onUploadSuccess={() => {
-          loadDatasets();
-        }}
-        onStartNewChatWithDataset={(datasetName) => {
-          handleConfirmNewChat({ source: "storage", datasetName });
-        }}
       />
     </div>
   );

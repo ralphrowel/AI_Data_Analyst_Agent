@@ -2,6 +2,8 @@ import { useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 
 export default function Header({
+  activeTab = "chat",
+  onTabChange,
   chartType,
   chartEnabled,
   onChartTypeChange,
@@ -15,7 +17,6 @@ export default function Header({
   chartTheme,
   onChartThemeChange,
   activeDatasetName,
-  onOpenUpload,
 }) {
   const [showClearModal, setShowClearModal] = useState(false);
   const options = [
@@ -46,33 +47,57 @@ export default function Header({
           </svg>
           <span className="font-mono text-[11px] font-semibold">{activeDatasetName || "No dataset"}</span>
         </div>
-
-        <button
-          type="button"
-          onClick={onOpenUpload}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-100 dark:bg-gray-800 hover:bg-surface-200 dark:hover:bg-gray-700 border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-200 text-xs font-medium transition-colors cursor-pointer shadow-xs"
-          title="Upload new CSV dataset or knowledge document"
-        >
-          <svg className="w-3.5 h-3.5 text-surface-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-          </svg>
-          <span>Upload</span>
-        </button>
       </div>
 
+      {/* Center Segmented Tab Switcher */}
+      <div className="flex-1 flex justify-center items-center">
+        <div className="flex items-center p-0.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 select-none shadow-xs">
+          <button
+            type="button"
+            onClick={() => onTabChange && onTabChange("chat")}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-md transition-all cursor-pointer ${
+              activeTab === "chat"
+                ? "bg-white dark:bg-gray-700 text-surface-900 dark:text-white shadow-xs font-semibold"
+                : "text-surface-500 dark:text-gray-400 hover:text-surface-800 dark:hover:text-gray-200 font-medium"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v5.518z" />
+            </svg>
+            <span>Chat & Insights</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange && onTabChange("spreadsheet")}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-md transition-all cursor-pointer ${
+              activeTab === "spreadsheet"
+                ? "bg-white dark:bg-gray-700 text-surface-900 dark:text-white shadow-xs font-semibold"
+                : "text-surface-500 dark:text-gray-400 hover:text-surface-800 dark:hover:text-gray-200 font-medium"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h17.25" />
+            </svg>
+            <span>Spreadsheet</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange && onTabChange("dashboard")}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-md transition-all cursor-pointer ${
+              activeTab === "dashboard"
+                ? "bg-white dark:bg-gray-700 text-surface-900 dark:text-white shadow-xs font-semibold"
+                : "text-surface-500 dark:text-gray-400 hover:text-surface-800 dark:hover:text-gray-200 font-medium"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
+            </svg>
+            <span>Dashboard</span>
+          </button>
 
-      <div className="flex-1 flex justify-center">
-        <div className="relative w-full max-w-md">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-surface-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search chats..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-50 dark:bg-gray-950 border border-surface-200 dark:border-gray-700 rounded-full text-surface-700 dark:text-gray-200 placeholder-surface-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-          />
         </div>
       </div>
+
 
       <div className="flex items-center gap-3 shrink-0">
         <button

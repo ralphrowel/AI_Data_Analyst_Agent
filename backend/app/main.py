@@ -4,7 +4,7 @@ from backend.app.config import ALLOWED_ORIGINS
 from backend.app.api.routes import router
 
 app = FastAPI(
-    title="AI Data Analyst Agent API",
+    title="Visiq — Autonomous AI Data Analyst API",
     description="Modular backend for structured data analysis and RAG retrieval",
     version="1.0.0",
 )

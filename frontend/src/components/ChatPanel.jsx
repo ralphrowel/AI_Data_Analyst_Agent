@@ -16,6 +16,7 @@ export default function ChatPanel({
   activeDatasetName,
   datasetInfo,
   onNewChat,
+  onPinToDashboard,
 }) {
   const [input, setInput] = useState("");
 
@@ -42,7 +43,12 @@ export default function ChatPanel({
         />
       ) : (
         <>
-          <MessageList messages={messages} isStreaming={isStreaming} />
+          <MessageList
+            messages={messages}
+            isStreaming={isStreaming}
+            onPinToDashboard={onPinToDashboard}
+          />
+
           <div className="px-6 py-4 max-w-2xl mx-auto w-full">
             <Toolbar
               chartType={chartType}
