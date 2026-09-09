@@ -49,7 +49,7 @@ def normalize_usage(response, provider: str) -> dict:
     }
 
 
-def call_llm(
+def _call_llm(
     prompt: str,
     client: genai.Client | None = None,
     model: str | None = None,
@@ -109,3 +109,17 @@ def call_llm(
         return groq_resp, "groq"
 
     raise RuntimeError("No LLM client is configured. Please check your API keys.")
+
+
+def call_llm(prompt, client=None, model=None, provider=None):
+    """Meter every successful provider call, including routing and widgets."""
+    from backend.app.auth.context import request_user_id
+    from backend.app.auth.quota_manager import default_quota_manager
+    user_id = request_user_id.get()
+    if user_id:
+        default_quota_manager.check_quota(user_id)
+    response, used_provider = _call_llm(prompt, client=client, model=model, provider=provider)
+    if user_id:
+        usage = normalize_usage(response, used_provider)
+        default_quota_manager.record_usage(user_id, usage.get('total_tokens', 0) or 0)
+    return response, used_provider

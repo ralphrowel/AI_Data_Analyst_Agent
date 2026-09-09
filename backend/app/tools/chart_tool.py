@@ -230,7 +230,7 @@ def generate_chart(result: dict, chart_type: str | None = None, chart_theme: str
 
         import re
         chart_svg = re.sub(
-            r'(<g id="datum__([^_]+)__([^"]+)">)',
+            r'(<g id="datum__(.*?)__([^"]+)">)',
             r'\1<title>\2: \3</title>',
             svg_raw,
         )

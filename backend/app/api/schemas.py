@@ -1,13 +1,26 @@
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Literal
+from backend.app.paths import filename as validate_filename
+from backend.app.config import MAX_UPLOAD_BYTES
+
+class RequestModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
+    @field_validator('question', 'prompt', check_fields=False)
+    @classmethod
+    def nonempty_text(cls, value):
+        if value is not None and not value.strip():
+            raise ValueError('Text must not be blank')
+        return value
 
 
-class QuestionRequest(BaseModel):
-    question: str
+class QuestionRequest(RequestModel):
+    question: str = Field(min_length=1, max_length=12000)
     chart_type: Optional[str] = None
-    chart_theme: str = "light"
+    chart_theme: Literal["light", "dark"] = "light"
     session_id: Optional[str] = None
-    provider: Optional[str] = None
+    provider: Optional[Literal["groq", "gemini"]] = None
 
 
 class AnalysisResponse(BaseModel):
@@ -21,15 +34,22 @@ class AnalysisResponse(BaseModel):
     model_used: str = "gemini"
 
 
-class CreateSessionRequest(BaseModel):
+class CreateSessionRequest(RequestModel):
     dataset_name: Optional[str] = None
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+
+
+    @field_validator("dataset_name")
+    @classmethod
+    def safe_dataset(cls, value):
+        return validate_filename(value) if value is not None else value
 
 
 class SessionResponse(BaseModel):
     session_id: str
     title: str
     dataset_name: str
+    user_id: Optional[str] = None
     created_at: str
     message_count: int
     widget_count: int = 0
@@ -43,22 +63,39 @@ class DatasetInfo(BaseModel):
     columns: int
     size_bytes: int
     modified_at: Optional[str] = None
+    is_private: bool = False
+
+
+class UserQuotaResponse(BaseModel):
+    user_id: str
+    date: str
+    tokens_used: int
+    daily_limit: int
+    tokens_remaining: int
+    percentage_used: float
+    reset_time: str = "Midnight UTC"
 
 
 class RecentGraphInfo(BaseModel):
     session_id: str
     session_title: str
     dataset_name: str
-    prompt: str
+    prompt: str = Field(min_length=1, max_length=12000)
     chart_base64: Optional[str] = None
     chart_svg: Optional[str] = None
     chart_type: Optional[str] = None
     created_at: Optional[str] = None
 
 
-class UploadDatasetRequest(BaseModel):
+class UploadDatasetRequest(RequestModel):
     filename: str
-    content: str
+    content: str = Field(min_length=1, max_length=MAX_UPLOAD_BYTES)
+
+
+    @field_validator("filename")
+    @classmethod
+    def safe_filename(cls, value):
+        return validate_filename(value)
 
 
 class UploadResponse(BaseModel):
@@ -71,28 +108,28 @@ class UploadResponse(BaseModel):
     message: Optional[str] = None
 
 
-class CellUpdate(BaseModel):
-    row_index: int
+class CellUpdate(RequestModel):
+    row_index: int = Field(ge=0)
     column: str
     value: Any
 
 
-class UpdateDatasetRequest(BaseModel):
-    updates: List[CellUpdate]
+class UpdateDatasetRequest(RequestModel):
+    updates: List[CellUpdate] = Field(min_length=1, max_length=1000)
 
 
-class AddRowRequest(BaseModel):
+class AddRowRequest(RequestModel):
     row_data: Dict[str, Any]
 
 
-class CreateWidgetRequest(BaseModel):
-    prompt: str
+class CreateWidgetRequest(RequestModel):
+    prompt: str = Field(min_length=1, max_length=12000)
     chart_type: Optional[str] = None
-    chart_theme: str = "light"
-    provider: Optional[str] = None
+    chart_theme: Literal["light", "dark"] = "light"
+    provider: Optional[Literal["groq", "gemini"]] = None
 
 
-class PinWidgetRequest(BaseModel):
+class PinWidgetRequest(RequestModel):
     title: Optional[str] = None
     prompt: Optional[str] = None
     chart_base64: Optional[str] = None

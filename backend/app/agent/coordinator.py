@@ -123,6 +123,7 @@ class AgentCoordinator:
         provider: Optional[str] = None,
         chart_type: Optional[str] = None,
         chart_theme: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute a user question through routing, deterministic tool invocation, and summarization.
 
@@ -132,13 +133,14 @@ class AgentCoordinator:
             provider: Optional LLM provider override ('gemini' or 'groq').
             chart_type: Optional chart type ('bar', 'line', 'pie', 'auto').
             chart_theme: Optional visual theme for matplotlib rendering.
+            user_id: Optional user identifier for workspace isolation.
 
         Returns:
             Dict containing summary, chart_base64, operation, result, usage, model_used, and route.
         """
-        session = self.memory.get_session(session_id)
+        session = self.memory.get_session(session_id, user_id=user_id)
         if not session:
-            session = self.memory.ensure_default_session()
+            session = self.memory.ensure_default_session(user_id=user_id or "user_default")
 
         df = session.df
         data_description = session.data_description
@@ -172,7 +174,7 @@ class AgentCoordinator:
         if route == "rag":
             operation = "search_documents"
             rag_tool = self.registry.get("search_documents")
-            excerpts = rag_tool(query=question) if rag_tool else []
+            excerpts = rag_tool(query=question, user_id=session.user_id) if rag_tool else []
             serializable_result = excerpts
 
             rag_prompt = build_rag_summary_prompt(question, excerpts)
@@ -194,7 +196,7 @@ class AgentCoordinator:
                 question=question,
                 data_description=data_description,
                 tools_schemas=schemas,
-                history=session.history[:-1],  # exclude current user turn from history snippet
+                history=session.history,  # snapshot was loaded before appending this turn
             )
 
             resp, prov = call_llm(selection_prompt, client=self.client, provider=provider)
@@ -247,7 +249,8 @@ class AgentCoordinator:
 
             try:
                 if tool_name == "search_documents":
-                    raw_result = tool_fn(**params)
+                    params.pop("user_id", None)
+                    raw_result = tool_fn(**params, user_id=session.user_id)
                 else:
                     raw_result = tool_fn(df=df, **params)
             except Exception as err:
@@ -267,7 +270,7 @@ class AgentCoordinator:
             if route == "hybrid":
                 # For hybrid, also retrieve documentation context
                 rag_tool = self.registry.get("search_documents")
-                excerpts = rag_tool(query=question) if rag_tool else []
+                excerpts = rag_tool(query=question, user_id=session.user_id) if rag_tool else []
                 hybrid_prompt = build_hybrid_summary_prompt(
                     question=question,
                     tool_result=serializable_result,

@@ -1,0 +1,12 @@
+{
+  "user_a_alice": {
+    "date": "2026-09-09",
+    "tokens_used": 0,
+    "daily_limit": 50000
+  },
+  "user_b_bob": {
+    "date": "2026-09-09",
+    "tokens_used": 0,
+    "daily_limit": 50000
+  }
+}

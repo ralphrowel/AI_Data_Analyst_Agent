@@ -58,3 +58,8 @@ class DocumentRetriever:
 
 # Global singleton retriever instance
 default_retriever = DocumentRetriever()
+
+def get_user_retriever(user_id):
+    from backend.app.config import KNOWLEDGE_DIR
+    from backend.app.paths import inside
+    return DocumentRetriever(DocumentIndexer(inside(KNOWLEDGE_DIR, user_id)))

@@ -128,7 +128,8 @@ class WidgetEngine:
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
 
-        session.widgets.append(widget)
+        from backend.app.memory.session_store import default_session_store
+        default_session_store.add_widget(session.session_id, widget)
         return widget
 
     def create_widget_from_chat(
@@ -161,7 +162,8 @@ class WidgetEngine:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
-        session.widgets.append(widget)
+        from backend.app.memory.session_store import default_session_store
+        default_session_store.add_widget(session.session_id, widget)
         return widget
 
     def recompute_widgets(
@@ -194,6 +196,8 @@ class WidgetEngine:
             except Exception as e:
                 logger.warning(f"Failed to recompute widget {widget.get('id')}: {e}")
 
+        from backend.app.memory.session_store import default_session_store
+        default_session_store.set_widgets(session.session_id, session.widgets)
         return session.widgets
 
     def _execute_recipe(

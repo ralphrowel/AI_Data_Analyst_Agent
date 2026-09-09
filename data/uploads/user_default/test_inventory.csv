@@ -1,0 +1,6 @@
+product_id,category,price,stock,rating
+p101,Electronics,299.99,50,4.5
+p102,Electronics,899.00,20,4.8
+p103,Furniture,149.50,15,4.2
+p104,Office Supplies,12.99,200,4.1
+p105,Furniture,499.00,8,4.7

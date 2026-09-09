@@ -1,7 +1,6 @@
 import { useState } from "react";
 import MessageList from "./MessageList";
 import InputBar from "./InputBar";
-import Toolbar from "./Toolbar";
 import ChatHome from "./ChatHome";
 
 export default function ChatPanel({
@@ -50,12 +49,6 @@ export default function ChatPanel({
           />
 
           <div className="px-6 py-4 max-w-2xl mx-auto w-full">
-            <Toolbar
-              chartType={chartType}
-              chartEnabled={chartEnabled}
-              onChartTypeChange={onChartTypeChange}
-              onChartEnabledChange={onChartEnabledChange}
-            />
             <InputBar
               value={input}
               onChange={setInput}

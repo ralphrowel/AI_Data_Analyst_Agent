@@ -9,7 +9,10 @@ import {
   deleteSession,
   uploadDataset,
   pinWidgetToSession,
+  fetchUserQuota,
+  setAuthToken,
 } from "../api";
+import { supabase, isSupabaseConfigured, DEMO_ACCOUNTS, demoAuthEnabled } from "../supabase";
 import Sidebar from "./Sidebar";
 import ChatPanel from "./ChatPanel";
 import ChartPanel from "./ChartPanel";
@@ -18,8 +21,7 @@ import SpreadsheetPanel from "./SpreadsheetPanel";
 import DashboardPanel from "./DashboardPanel";
 import NewChatModal from "./NewChatModal";
 import HomePage from "./HomePage";
-
-
+import AuthModal from "./AuthModal";
 
 let messageId = 0;
 
@@ -32,6 +34,19 @@ const DEFAULT_TOKEN_USAGE = {
 };
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("visiq_current_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [userQuota, setUserQuota] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(() => {
+    return !localStorage.getItem("visiq_current_user");
+  });
+
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [activeTab, setActiveTab] = useState("chat");
@@ -74,24 +89,90 @@ export default function App() {
     setChartTheme(darkMode ? "dark" : "light");
   }, [darkMode]);
 
+  const loadQuota = useCallback(() => {
+    fetchUserQuota()
+      .then((q) => {
+        if (q) setUserQuota(q);
+      })
+      .catch(() => {});
+  }, []);
+
   const loadDatasets = useCallback(() => {
     fetchDatasets()
       .then((data) => setAvailableDatasets(data))
       .catch(() => {});
   }, []);
 
-  // Initial load: fetch datasets and sessions (always default to Home panel)
+  // When currentUser changes: synchronize auth token, reload datasets, sessions & quota
   useEffect(() => {
+    if (!currentUser) {
+      setAuthToken(null);
+      setSessions([]);
+      setMessages([]);
+      setCharts([]);
+      setAvailableDatasets([]);
+      setUserQuota(null);
+      setActiveSessionId(null);
+      setShowAuthModal(true);
+      return;
+    }
+    setShowAuthModal(false);
+    if (currentUser?.token) {
+      setAuthToken(currentUser.token);
+    }
+    localStorage.setItem("visiq_current_user", JSON.stringify(currentUser));
     loadDatasets();
-
     fetchSessions()
       .then((sessionList) => {
         setSessions(sessionList || []);
         setActiveSessionId(null);
         localStorage.removeItem("activeSessionId");
+        setMessages([]);
+        setCharts([]);
       })
       .catch(() => {});
-  }, [loadDatasets]);
+    loadQuota();
+  }, [currentUser, loadDatasets, loadQuota]);
+
+  // Live Supabase Auth Subscription
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setAuthToken(session.access_token);
+          const u = {
+            id: session.user.id,
+            token: session.access_token,
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+            avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
+            role: "Supabase User",
+          };
+          setCurrentUser(u);
+        }
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session) {
+          setAuthToken(session.access_token);
+          const u = {
+            id: session.user.id,
+            token: session.access_token,
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+            avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
+            role: "Supabase User",
+          };
+          setCurrentUser(u);
+        } else if (event === "SIGNED_OUT") {
+          setAuthToken(null);
+          setCurrentUser(null);
+        }
+      });
+
+      return () => subscription?.unsubscribe();
+    }
+  }, []);
 
   // When activeSessionId changes, load its details, history, and suggestions
   useEffect(() => {
@@ -131,11 +212,11 @@ export default function App() {
           });
         }
       })
-      .catch(() => { });
+      .catch(() => {});
 
     fetchSuggestions(activeSessionId)
       .then((suggs) => setSuggestions(suggs))
-      .catch(() => { });
+      .catch(() => {});
   }, [activeSessionId]);
 
   const handleSelectSession = useCallback((sessionId) => {
@@ -306,22 +387,27 @@ export default function App() {
           });
         }
 
+        // Refresh live token quota allowance
+        loadQuota();
+
         // Refresh sessions list to display updated message count and title
-        fetchSessions().then((list) => setSessions(list)).catch(() => { });
-      } catch {
+        fetchSessions().then((list) => setSessions(list)).catch(() => {});
+      } catch (err) {
+        const errMsg = err?.message || "Sorry, something went wrong. Please try again.";
         setMessages((prev) => [
           ...prev,
           {
             id: ++messageId,
             role: "assistant",
-            text: "Sorry, something went wrong. Please try again.",
+            text: errMsg,
             operation: "error",
           },
         ]);
+        loadQuota();
       }
       setIsStreaming(false);
     },
-    [chartType, isStreaming, charts.length, activeModel, chartTheme, selectedModel, activeSessionId]
+    [chartType, isStreaming, charts.length, activeModel, chartTheme, selectedModel, activeSessionId, loadQuota]
   );
 
   return (
@@ -359,6 +445,9 @@ export default function App() {
                 chartTheme={chartTheme}
                 onChartThemeChange={setChartTheme}
                 activeDatasetName={activeDatasetName}
+                currentUser={currentUser}
+                userQuota={userQuota}
+                onOpenAuthModal={() => setShowAuthModal(true)}
               />
             </div>
             {activeTab === "chat" ? (
@@ -400,7 +489,6 @@ export default function App() {
                 selectedModel={selectedModel}
               />
             )}
-
           </>
         ) : (
           <HomePage
@@ -413,6 +501,9 @@ export default function App() {
             setDarkMode={setDarkMode}
             selectedModel={selectedModel}
             onRefreshData={loadDatasets}
+            currentUser={currentUser}
+            userQuota={userQuota}
+            onOpenAuthModal={() => setShowAuthModal(true)}
           />
         )}
       </div>
@@ -422,7 +513,15 @@ export default function App() {
         onClose={() => setShowNewChatModal(false)}
         onCreate={handleConfirmNewChat}
       />
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        currentUser={currentUser}
+        onUserChanged={(user) => {
+          setCurrentUser(user);
+        }}
+      />
     </div>
   );
 }
-

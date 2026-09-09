@@ -59,6 +59,8 @@ class DocumentIndexer:
         for ext in ("*.md", "*.txt"):
             for file_path in self.knowledge_dir.glob(ext):
                 try:
+                    from backend.app.paths import inside
+                    file_path = inside(self.knowledge_dir, file_path.name)
                     with open(file_path, "r", encoding="utf-8") as f:
                         docs.append({
                             "filename": file_path.name,

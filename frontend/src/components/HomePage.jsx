@@ -32,6 +32,9 @@ export default function HomePage({
   darkMode,
   setDarkMode,
   selectedModel = "groq",
+  currentUser,
+  userQuota,
+  onOpenAuthModal,
 }) {
   const [recentGraphs, setRecentGraphs] = useState([]);
   const [datasetChanges, setDatasetChanges] = useState([]);
@@ -119,6 +122,53 @@ export default function HomePage({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
               </svg>
             )}
+          </button>
+
+          {/* Daily Quota Indicator */}
+          {userQuota && (
+            <div
+              className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 select-none shadow-xs"
+              title={`Daily Quota: ${(userQuota.tokens_used || 0).toLocaleString()} / ${(userQuota.daily_limit || 50000).toLocaleString()} used today`}
+            >
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center justify-between gap-1.5 text-[10px] font-mono leading-none">
+                  <span className="text-surface-500 dark:text-gray-400">Tokens</span>
+                  <span className="font-semibold text-surface-800 dark:text-gray-200">
+                    {((userQuota.tokens_remaining ?? 50000)).toLocaleString()} left
+                  </span>
+                </div>
+                <div className="w-16 h-1.5 bg-surface-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      (userQuota.percentage_used || 0) > 80
+                        ? "bg-red-500"
+                        : (userQuota.percentage_used || 0) > 50
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${Math.max(4, 100 - (userQuota.percentage_used || 0))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* User Profile Pill */}
+          <button
+            type="button"
+            onClick={onOpenAuthModal}
+            className="flex items-center gap-2 px-2.5 py-1 rounded-lg hover:bg-surface-100 dark:hover:bg-gray-800 transition-colors cursor-pointer border border-surface-200 dark:border-gray-700 shadow-xs select-none"
+            title="Switch User Identity / Supabase Login"
+          >
+            <div className="w-5 h-5 rounded-full bg-accent text-white font-bold text-[10px] flex items-center justify-center">
+              {currentUser?.avatar || currentUser?.name?.[0] || currentUser?.email?.[0]?.toUpperCase() || "U"}
+            </div>
+            <span className="text-xs font-medium text-surface-700 dark:text-gray-200 max-w-[90px] truncate">
+              {currentUser?.name?.split(" ")[0] || currentUser?.email?.split("@")[0] || "Sign In"}
+            </span>
+            <svg className="w-3 h-3 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
         </div>
       </header>

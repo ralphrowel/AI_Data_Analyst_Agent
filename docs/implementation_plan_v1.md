@@ -11,12 +11,12 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 | Step 1 | Token Display Persistence       | Completed    | localStorage persistence, daily midnight auto-reset, provider breakdown (Groq / Gemini) with dots.   |
 | Step 2 | ToolRegistry Schemas            | Completed    | 7 structured tools registered in ToolRegistry with Gemini-compatible function schemas.               |
 | Step 3 | Multi-Chat & Dataset Scoping    | Completed    | IDE-style isolated workspaces: SessionStore holds isolated df + history; + New Chat in sidebar.      |
-| Step 4 | Wire Coordinator Execution      | Current Task | AgentCoordinator.process_query() executes tool loops against the session's isolated dataset.         |
-| Step 5 | Router LLM Classification       | Planned      | Lightweight intent classification into Structured vs. RAG vs. Hybrid with heuristic fallback.        |
-| Step 6 | RAG Layer (Unstructured Data)   | Planned      | Text chunking + vector embeddings + semantic retrieval for markdown/text knowledge docs.             |
-| Step 7 | API Route Switchover            | Planned      | Connect /api/ask to AgentCoordinator behind a safety feature flag.                                   |
-| Step 8 | File Upload UI & Polish         | Planned      | Drag-and-drop CSV and doc uploads, dataset management UI, and final hardening.                       |
-| Step 9 | Supabase Auth & Client Quotas   | Planned      | Google 1-Click + Email login, per-user private sessions & datasets, and daily token budget metering.  |
+| Step 4 | Wire Coordinator Execution      | Completed    | AgentCoordinator.process_query() executes tool loops against the session's isolated dataset.         |
+| Step 5 | Router LLM Classification       | Completed    | Lightweight intent classification into Structured vs. RAG vs. Hybrid with heuristic fallback.        |
+| Step 6 | RAG Layer (Unstructured Data)   | Completed    | Text chunking + vector embeddings + semantic retrieval for markdown/text knowledge docs.             |
+| Step 7 | API Route Switchover            | Completed    | Connect /api/ask to AgentCoordinator behind a safety feature flag.                                   |
+| Step 8 | File Upload UI & Polish         | Completed    | Drag-and-drop CSV and doc uploads, dataset management UI, and final hardening.                       |
+| Step 9 | Supabase Auth & Client Quotas   | Completed    | Google 1-Click + Email login, per-user private sessions & datasets, and daily token budget metering.  |
 
 ---
 
@@ -132,24 +132,36 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 
 ---
 
-### [Current Task] Step 9 — Supabase Auth & Per-Client Token Quotas (Option 1)
-- **Goal:** Authenticate users with Google 1-Click / Email OTP via Supabase, scope chat workspaces & datasets privately per user, and enforce a daily per-client token allowance (e.g. 50,000 tokens/day) to prevent server quota exhaustion.
-
-- **What will be built:**
-  - **Backend Auth Dependency:**
-    - `backend/app/auth/supabase_auth.py`: FastAPI dependency validating Supabase JWT tokens (`get_current_user`).
-    - Scope `SessionStore`: Associate every `ChatSession` with `user_id`; `GET /api/sessions` filters strictly by the authenticated `user_id`.
-    - Private dataset storage: Isolate user-uploaded datasets under `data/uploads/{user_id}/`.
-  - **Token Metering & Quota Guard:**
-    - Track `tokens_used_today` per `user_id`.
-    - Reject queries with HTTP 429 ("Daily free token budget reached. Resets at midnight UTC.") before invoking Groq/Gemini if budget is exceeded.
-    - Increment user's token usage atomically upon successful LLM response.
+### [Completed] Step 9 — Supabase Auth & Per-Client Token Quotas (Option 1)
+- **Goal:** Authenticate users with Google 1-Click / Email OTP via Supabase, scope chat workspaces & datasets privately per user, and enforce a daily per-client token allowance (50,000 tokens/day) to prevent server quota exhaustion.
+- **Implemented:**
+  - **Backend Auth & Quota Layer:**
+    - `backend/app/auth/supabase_auth.py`: FastAPI dependency validating Supabase JWT tokens (`get_current_user`, `get_optional_user`) with support for live JWT verification and zero-config demo accounts.
+    - `backend/app/auth/quota_manager.py`: Daily UTC-resetting per-client token quota manager (`check_quota`, `record_usage`, `get_user_quota`) backed by `data/quotas.json`.
+    - `backend/app/memory/session_store.py`: `ChatSession` and `SessionStore` scoped strictly by `user_id`.
+    - `backend/app/data_engine/dataset_manager.py`: Multi-tenant dataset isolation separating global public datasets from private user uploads under `data/uploads/{user_id}/`.
+    - `backend/app/api/routes.py`: Secured `/api/sessions`, `/api/upload`, `/api/datasets`, `/api/auth/me`, `/api/user/quota`, and `/api/ask` (HTTP 429 quota guard triggered before LLM execution, atomic quota increment upon completion).
   - **Frontend Integration:**
-    - Install `@supabase/supabase-js`.
-    - Add Login / Sign-up modal with 1-Click "Sign in with Google" and Email Magic Link.
-    - Header User Profile badge showing current user email, sign-out button, and remaining daily token allowance progress bar.
-- **Verification:**
-  - Test sign-in for User A and User B.
-  - Confirm User A cannot see User B's sessions or uploaded CSV files.
-  - Confirm User A's token usage only depletes User A's daily quota, leaving User B unaffected.
+    - Installed `@supabase/supabase-js`.
+    - `frontend/src/supabase.js`: Configured client with live Supabase credentials and built-in demo profiles (Alice & Bob).
+    - `frontend/src/components/AuthModal.jsx`: Modal supporting Google 1-Click login, Email OTP/magic link, and zero-config profile switching.
+    - `frontend/src/components/Header.jsx`: Added user identity badge and live token quota allowance progress bar.
+    - `frontend/src/components/HomePage.jsx`: Added user identity pill and daily token quota indicator in top navigation.
+    - `frontend/src/api.js`: Automatic `Authorization: Bearer <token>` injection across all endpoints and friendly 429 error handling.
+    - `frontend/src/components/App.jsx`: Full auth lifecycle, reactive quota reloading, and multi-tenant workspace isolation.
+  - **Verified:**
+    - `scratch/test_step9_auth_quota.py`:
+      1. User A and User B profile resolution tested and verified.
+      2. Workspace isolation verified: User A cannot see User B's sessions in lists or via direct ID lookup.
+      3. Private dataset storage verified: User A's private CSV upload is isolated and completely invisible to User B.
+      4. Quota guard verified: Exhausting User A's 50,000 token limit returns HTTP 429 before LLM call; User B's quota remains untouched and unblocked.
+    - `scratch/test_step8_hardening.py`: Zero regression verified across all file upload and RAG auto-indexing capabilities.
+    - Frontend bundle: `npm run build` compiled with 0 errors.
 
+---
+
+
+
+### Security and persistence follow-up (2026-09-10)
+
+Step 9 implementation now requires authenticated private routes and verified Supabase tokens. Demo identities are explicitly development-only. PostgreSQL backs users, sessions, quota records, activity, and dataset metadata; private RAG and safe bounded uploads replace shared uploads. Automated pytest regression and PostgreSQL CI replace the scratch verification scripts. See README setup and rollout notes; live OAuth/provider smoke checks depend on deployment credentials.
