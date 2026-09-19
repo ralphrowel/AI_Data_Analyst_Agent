@@ -63,7 +63,7 @@ export default function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("darkMode") === "true"
+    () => localStorage.getItem("darkMode") !== "false"
   );
   const [selectedModel, setSelectedModel] = useState(
     () => localStorage.getItem("selectedModel") || "groq"
@@ -72,7 +72,7 @@ export default function App() {
     () => localStorage.getItem("selectedModel") || "groq"
   );
   const [chartTheme, setChartTheme] = useState(
-    () => localStorage.getItem("darkMode") === "true" ? "dark" : "light"
+    () => localStorage.getItem("darkMode") === "false" ? "light" : "dark"
   );
 
   const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
