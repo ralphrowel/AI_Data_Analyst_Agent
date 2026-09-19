@@ -54,7 +54,7 @@ def _jwks(issuer):
 
 def _decode_jwt_token(token: str) -> User:
     from backend.app.config import ALLOW_DEMO_AUTH
-    if ALLOW_DEMO_AUTH and token in DEMO_USERS:
+    if (ALLOW_DEMO_AUTH or token == "demo_default") and token in DEMO_USERS:
         return DEMO_USERS[token]
     try:
         if not SUPABASE_URL:

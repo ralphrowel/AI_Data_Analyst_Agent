@@ -20,6 +20,8 @@ export default function Header({
   currentUser,
   userQuota,
   onOpenAuthModal,
+  onStartTour,
+  guestQueriesRemaining = 5,
 }) {
   const [showClearModal, setShowClearModal] = useState(false);
   const options = [
@@ -42,6 +44,7 @@ export default function Header({
     <header className="flex items-center gap-4 px-4 py-2 border-b border-surface-200 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0">
       <div className="flex items-center gap-2 shrink-0">
         <div
+          data-tour="active-dataset"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-200 text-xs font-medium select-none shadow-xs"
           title="Active dataset locked to this chat void"
         >
@@ -54,7 +57,7 @@ export default function Header({
 
       {/* Center Segmented Tab Switcher */}
       <div className="flex-1 flex justify-center items-center">
-        <div className="flex items-center p-0.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 select-none shadow-xs">
+        <div data-tour="tab-switcher" className="flex items-center p-0.5 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 select-none shadow-xs">
           <button
             type="button"
             onClick={() => onTabChange && onTabChange("chat")}
@@ -266,6 +269,31 @@ export default function Header({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Tour trigger button */}
+        <button
+          type="button"
+          onClick={onStartTour}
+          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg text-surface-600 dark:text-gray-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-100 dark:hover:bg-gray-800 transition-colors cursor-pointer border border-surface-200 dark:border-gray-700 shadow-xs"
+          title="Start interactive guided tour"
+        >
+          <span className="w-3.5 h-3.5 rounded-full bg-accent/20 text-accent font-bold text-[10px] flex items-center justify-center">?</span>
+          <span className="hidden sm:inline">Tour</span>
+        </button>
+
+        {/* Guest Demo Mode Pill */}
+        {currentUser?.isGuest && (
+          <button
+            type="button"
+            onClick={onOpenAuthModal}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer shadow-xs"
+            title="Guest Demo: Click to sign in for full 50,000 tokens & dataset uploads"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span>Demo ({guestQueriesRemaining} left)</span>
+            <span className="text-[10px] underline opacity-80 ml-0.5">Sign in</span>
+          </button>
         )}
 
         {/* User Identity Profile Pill */}

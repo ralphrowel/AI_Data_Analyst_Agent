@@ -6,7 +6,7 @@ export default function InputBar({ value, onChange, onSubmit, isStreaming }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} data-tour="chat-input" className="flex gap-2">
       <input
         type="text"
         value={value}

@@ -22,6 +22,7 @@ import DashboardPanel from "./DashboardPanel";
 import NewChatModal from "./NewChatModal";
 import HomePage from "./HomePage";
 import AuthModal from "./AuthModal";
+import ProductTour from "./ProductTour";
 
 let messageId = 0;
 
@@ -32,6 +33,8 @@ const DEFAULT_TOKEN_USAGE = {
   gemini_tokens: 0,
   groq_tokens: 0,
 };
+
+const MAX_GUEST_QUERIES = 5;
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -45,6 +48,11 @@ export default function App() {
   const [userQuota, setUserQuota] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(() => {
     return !localStorage.getItem("visiq_current_user");
+  });
+  const [authModalBanner, setAuthModalBanner] = useState("");
+  const [showProductTour, setShowProductTour] = useState(false);
+  const [guestQueriesCount, setGuestQueriesCount] = useState(() => {
+    return Number(localStorage.getItem("visiq_guest_queries") || 0);
   });
 
   const [sessions, setSessions] = useState([]);
@@ -77,6 +85,7 @@ export default function App() {
 
   const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
   const activeDatasetName = activeSession?.dataset_name || null;
+  const guestQueriesRemaining = Math.max(0, MAX_GUEST_QUERIES - guestQueriesCount);
 
   // Dark mode effect
   useEffect(() => {
@@ -117,20 +126,49 @@ export default function App() {
       return;
     }
     setShowAuthModal(false);
+    setAuthModalBanner("");
     if (currentUser?.token) {
       setAuthToken(currentUser.token);
     }
     localStorage.setItem("visiq_current_user", JSON.stringify(currentUser));
     loadDatasets();
+
     fetchSessions()
-      .then((sessionList) => {
-        setSessions(sessionList || []);
+      .then(async (sessionList) => {
+        let list = sessionList || [];
+        // If guest user, ensure Netflix session exists and is active immediately
+        if (currentUser?.isGuest) {
+          let netflixSession = list.find((s) => s.dataset_name === "netflix_titles.csv");
+          if (!netflixSession) {
+            try {
+              netflixSession = await createSession("netflix_titles.csv", "Netflix Catalog Analysis");
+              list = [netflixSession, ...list];
+            } catch (err) {
+              console.error("Failed to auto-create guest session:", err);
+            }
+          }
+          if (netflixSession) {
+            setSessions(list);
+            setActiveSessionId(netflixSession.session_id);
+            localStorage.setItem("activeSessionId", netflixSession.session_id);
+            setActiveTab("chat");
+
+            // Trigger guided tour for first-time visitors
+            if (!localStorage.getItem("hasSeenTour")) {
+              setTimeout(() => setShowProductTour(true), 700);
+            }
+            return;
+          }
+        }
+
+        setSessions(list);
         setActiveSessionId(null);
         localStorage.removeItem("activeSessionId");
         setMessages([]);
         setCharts([]);
       })
       .catch(() => {});
+
     loadQuota();
   }, [currentUser, loadDatasets, loadQuota]);
 
@@ -147,6 +185,7 @@ export default function App() {
             name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
             avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
             role: "Supabase User",
+            isGuest: false,
           };
           setCurrentUser(u);
         }
@@ -162,10 +201,10 @@ export default function App() {
             name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
             avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
             role: "Supabase User",
+            isGuest: false,
           };
           setCurrentUser(u);
         } else if (event === "SIGNED_OUT") {
-          setAuthToken(null);
           setCurrentUser(null);
         }
       });
@@ -174,54 +213,46 @@ export default function App() {
     }
   }, []);
 
-  // When activeSessionId changes, load its details, history, and suggestions
+  // Fetch dataset suggestions when active dataset changes
   useEffect(() => {
-    if (!activeSessionId) return;
+    if (activeDatasetName) {
+      fetchSuggestions(activeDatasetName)
+        .then((sug) => setSuggestions(sug))
+        .catch(() => setSuggestions([]));
+    } else {
+      setSuggestions([]);
+    }
+  }, [activeDatasetName]);
 
-    fetchSessionDetails(activeSessionId)
-      .then((detail) => {
-        if (detail.history && detail.history.length > 0) {
-          const restoredMessages = detail.history.map((turn) => ({
-            id: ++messageId,
-            role: turn.role,
-            text: turn.content,
-            operation: turn.metadata?.operation,
-            chart_base64: turn.metadata?.chart_base64,
-            chart_svg: turn.metadata?.chart_svg,
-            chart_spec: turn.metadata?.chart_spec,
-          }));
-          setMessages(restoredMessages);
-          const restoredCharts = restoredMessages
-            .filter((m) => m.chart_base64 || m.chart_svg)
-            .map((m) => ({ chart_base64: m.chart_base64, chart_svg: m.chart_svg }));
-          setCharts(restoredCharts);
-          setCurrentChartIndex(restoredCharts.length > 0 ? restoredCharts.length - 1 : 0);
-        } else {
-          setMessages([]);
-          setCharts([]);
-          setCurrentChartIndex(0);
-        }
+  // Load session messages when activeSessionId changes
+  useEffect(() => {
+    if (activeSessionId) {
+      fetchSessionDetails(activeSessionId)
+        .then((details) => {
+          if (details && details.messages) {
+            const formatted = details.messages.map((m) => ({
+              id: ++messageId,
+              role: m.role,
+              text: m.text,
+              operation: m.operation,
+              unsupported_reason: m.unsupported_reason,
+              chart_base64: m.chart_base64,
+              chart_svg: m.chart_svg,
+              chart_spec: m.chart_spec,
+            }));
+            setMessages(formatted);
 
-        if (detail.token_usage) {
-          setTokenUsage({
-            prompt_tokens: detail.token_usage.prompt_tokens || 0,
-            response_tokens: detail.token_usage.response_tokens || 0,
-            total_tokens: detail.token_usage.total_tokens || 0,
-            gemini_tokens: detail.token_usage.gemini_tokens || 0,
-            groq_tokens: detail.token_usage.groq_tokens || 0,
-          });
-        }
-      })
-      .catch(() => {});
-
-    fetchSuggestions(activeSessionId)
-      .then((suggs) => setSuggestions(suggs))
-      .catch(() => {});
+            const sessionCharts = formatted.filter((m) => m.chart_base64 || m.chart_svg);
+            setCharts(sessionCharts);
+            setCurrentChartIndex(Math.max(0, sessionCharts.length - 1));
+          }
+        })
+        .catch(() => {});
+    }
   }, [activeSessionId]);
 
   const handleSelectSession = useCallback((sessionId) => {
     setActiveSessionId(sessionId);
-    setActiveTab("chat");
     if (sessionId) {
       localStorage.setItem("activeSessionId", sessionId);
     } else {
@@ -233,11 +264,27 @@ export default function App() {
     setCurrentChartIndex(0);
   }, []);
 
+  const handleNewChatClick = useCallback(() => {
+    if (currentUser?.isGuest) {
+      setAuthModalBanner(
+        "Sign in with Google or Email to create multiple custom workspaces and upload private CSV files."
+      );
+      setShowAuthModal(true);
+      return;
+    }
+    setShowNewChatModal(true);
+  }, [currentUser]);
+
   const handleConfirmNewChat = useCallback(
     async ({ file, datasetName, title }) => {
       try {
         let targetDataset = datasetName;
         if (file) {
+          if (currentUser?.isGuest) {
+            setAuthModalBanner("Guest accounts cannot upload private datasets. Please sign in with Google or Email.");
+            setShowAuthModal(true);
+            return;
+          }
           const fileContent = await file.text();
           const uploadRes = await uploadDataset(file.name, fileContent);
           targetDataset = uploadRes.name || uploadRes.filename || file.name;
@@ -270,7 +317,7 @@ export default function App() {
         alert("Failed to create workspace. Please check the file and try again.");
       }
     },
-    []
+    [currentUser]
   );
 
   const handleDeleteSession = useCallback(async (sessionId) => {
@@ -327,6 +374,15 @@ export default function App() {
     async (question) => {
       if (!question.trim() || isStreaming) return;
 
+      // Guest query limit enforcement
+      if (currentUser?.isGuest && guestQueriesCount >= MAX_GUEST_QUERIES) {
+        setAuthModalBanner(
+          "You've reached your 5 free demo queries! Sign in with Google or Email for 50,000 daily tokens, unlimited chats, and private dataset uploads."
+        );
+        setShowAuthModal(true);
+        return;
+      }
+
       const userMsg = { id: ++messageId, role: "user", text: question };
       setMessages((prev) => [...prev, userMsg]);
       setIsStreaming(true);
@@ -368,65 +424,104 @@ export default function App() {
 
         if (data.chart_base64 || data.chart_svg) {
           setCharts((prev) => {
-            const next = [...prev, { chart_base64: data.chart_base64, chart_svg: data.chart_svg }];
+            const next = [...prev, assistantMsg];
             setCurrentChartIndex(next.length - 1);
             return next;
           });
         }
 
-        if (data.usage) {
-          setTokenUsage((prev) => {
-            const callTokens = data.usage.total_tokens || 0;
-            return {
-              prompt_tokens: prev.prompt_tokens + (data.usage.prompt_tokens || 0),
-              response_tokens: prev.response_tokens + (data.usage.response_tokens || 0),
-              total_tokens: prev.total_tokens + callTokens,
-              gemini_tokens: (prev.gemini_tokens || 0) + (modelUsed === "gemini" ? callTokens : 0),
-              groq_tokens: (prev.groq_tokens || 0) + (modelUsed === "groq" ? callTokens : 0),
-            };
-          });
+        if (data.token_usage) {
+          setTokenUsage((prev) => ({
+            prompt_tokens: prev.prompt_tokens + (data.token_usage.prompt_tokens || 0),
+            response_tokens: prev.response_tokens + (data.token_usage.response_tokens || 0),
+            total_tokens: prev.total_tokens + (data.token_usage.total_tokens || 0),
+            gemini_tokens: prev.gemini_tokens + (data.token_usage.gemini_tokens || 0),
+            groq_tokens: prev.groq_tokens + (data.token_usage.groq_tokens || 0),
+          }));
         }
 
-        // Refresh live token quota allowance
         loadQuota();
 
-        // Refresh sessions list to display updated message count and title
-        fetchSessions().then((list) => setSessions(list)).catch(() => {});
+        // Track guest query count
+        if (currentUser?.isGuest) {
+          const nextCount = guestQueriesCount + 1;
+          setGuestQueriesCount(nextCount);
+          localStorage.setItem("visiq_guest_queries", nextCount);
+          if (nextCount >= MAX_GUEST_QUERIES) {
+            setTimeout(() => {
+              setAuthModalBanner(
+                "You've completed your 5 free demo queries! Sign in with Google or Email to continue chatting and unlock 50,000 daily tokens."
+              );
+              setShowAuthModal(true);
+            }, 1500);
+          }
+        }
       } catch (err) {
-        const errMsg = err?.message || "Sorry, something went wrong. Please try again.";
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: ++messageId,
-            role: "assistant",
-            text: errMsg,
-            operation: "error",
-          },
-        ]);
-        loadQuota();
+        if (err.status === 429 || (err.message && err.message.toLowerCase().includes("budget"))) {
+          setAuthModalBanner(
+            "You've reached your free guest demo limit. Sign in with Google or Email to unlock 50,000 daily tokens and custom uploads."
+          );
+          setShowAuthModal(true);
+        }
+        const errorMsg = {
+          id: ++messageId,
+          role: "assistant",
+          text: err.message || "An error occurred while analyzing the dataset.",
+          operation: "error",
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      } finally {
+        setIsStreaming(false);
       }
-      setIsStreaming(false);
     },
-    [chartType, isStreaming, charts.length, activeModel, chartTheme, selectedModel, activeSessionId, loadQuota]
+    [
+      isStreaming,
+      chartType,
+      chartTheme,
+      selectedModel,
+      activeSessionId,
+      loadQuota,
+      currentUser,
+      guestQueriesCount,
+    ]
   );
 
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 text-surface-800 dark:text-gray-100">
-      <div className="relative z-[3] h-full">
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed((prev) => !prev)}
-          tokenUsage={tokenUsage}
-          activeModel={activeModel}
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onNewChat={() => setShowNewChatModal(true)}
-          onDeleteSession={handleDeleteSession}
-        />
-      </div>
-      <div className="flex flex-col flex-1 min-w-0">
-        {activeSessionId ? (
+      {/* Sidebar */}
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        tokenUsage={tokenUsage}
+        activeModel={activeModel}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChatClick}
+        onDeleteSession={handleDeleteSession}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {activeSessionId === null ? (
+          <HomePage
+            sessions={sessions}
+            availableDatasets={availableDatasets}
+            onSelectSession={handleSelectSession}
+            onNewChat={handleNewChatClick}
+            onDeleteSession={handleDeleteSession}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            selectedModel={selectedModel}
+            onRefreshData={loadDatasets}
+            currentUser={currentUser}
+            userQuota={userQuota}
+            onOpenAuthModal={() => {
+              setAuthModalBanner("");
+              setShowAuthModal(true);
+            }}
+          />
+        ) : (
           <>
             <div className="relative z-[2]">
               <Header
@@ -447,7 +542,12 @@ export default function App() {
                 activeDatasetName={activeDatasetName}
                 currentUser={currentUser}
                 userQuota={userQuota}
-                onOpenAuthModal={() => setShowAuthModal(true)}
+                onOpenAuthModal={() => {
+                  setAuthModalBanner("");
+                  setShowAuthModal(true);
+                }}
+                onStartTour={() => setShowProductTour(true)}
+                guestQueriesRemaining={guestQueriesRemaining}
               />
             </div>
             {activeTab === "chat" ? (
@@ -463,48 +563,30 @@ export default function App() {
                   onSubmit={handleSubmit}
                   activeDatasetName={activeDatasetName}
                   datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
-                  onNewChat={() => setShowNewChatModal(true)}
                   onPinToDashboard={handlePinToDashboard}
                 />
-                {charts.length > 0 && (
-                  <ChartPanel
-                    charts={charts}
-                    currentIndex={currentChartIndex}
-                    onIndexChange={setCurrentChartIndex}
-                  />
-                )}
+                <ChartPanel
+                  charts={charts}
+                  currentIndex={currentChartIndex}
+                  onIndexChange={setCurrentChartIndex}
+                  theme={chartTheme}
+                  activeDatasetName={activeDatasetName}
+                  isStreaming={isStreaming}
+                />
               </div>
             ) : activeTab === "spreadsheet" ? (
               <SpreadsheetPanel
-                datasetName={activeDatasetName}
-                onDatasetUpdated={() => {
-                  loadDatasets();
-                }}
+                activeDatasetName={activeDatasetName}
+                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
               />
             ) : (
               <DashboardPanel
-                sessionId={activeSessionId}
-                datasetName={activeDatasetName}
-                chartTheme={chartTheme}
-                selectedModel={selectedModel}
+                activeSessionId={activeSessionId}
+                activeDatasetName={activeDatasetName}
+                theme={chartTheme}
               />
             )}
           </>
-        ) : (
-          <HomePage
-            sessions={sessions}
-            availableDatasets={availableDatasets}
-            onSelectSession={handleSelectSession}
-            onNewChat={() => setShowNewChatModal(true)}
-            onDeleteSession={handleDeleteSession}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-            selectedModel={selectedModel}
-            onRefreshData={loadDatasets}
-            currentUser={currentUser}
-            userQuota={userQuota}
-            onOpenAuthModal={() => setShowAuthModal(true)}
-          />
         )}
       </div>
 
@@ -518,9 +600,16 @@ export default function App() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         currentUser={currentUser}
+        bannerMessage={authModalBanner}
+        canClose={Boolean(currentUser)}
         onUserChanged={(user) => {
           setCurrentUser(user);
         }}
+      />
+
+      <ProductTour
+        isOpen={showProductTour}
+        onClose={() => setShowProductTour(false)}
       />
     </div>
   );

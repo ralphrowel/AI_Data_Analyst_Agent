@@ -223,9 +223,9 @@ class _SupabaseFileStore:
 def _make_store():
     from backend.app.config import (
         SUPABASE_URL, UPLOADS_DIR, KNOWLEDGE_DIR,
-        SUPABASE_SERVICE_KEY, SUPABASE_STORAGE_BUCKET,
+        SUPABASE_SERVICE_KEY, SUPABASE_STORAGE_BUCKET, APP_ENV,
     )
-    if SUPABASE_SERVICE_KEY and SUPABASE_URL:
+    if APP_ENV != "test" and SUPABASE_SERVICE_KEY and SUPABASE_URL:
         return _SupabaseFileStore(
             supabase_url=SUPABASE_URL,
             service_key=SUPABASE_SERVICE_KEY,
@@ -233,7 +233,7 @@ def _make_store():
             uploads_dir=UPLOADS_DIR,
             knowledge_dir=KNOWLEDGE_DIR,
         )
-    logger.info("SUPABASE_SERVICE_KEY not set — using local filesystem for file storage.")
+    logger.info("Using local filesystem for file storage.")
     return _LocalFileStore(uploads_dir=UPLOADS_DIR, knowledge_dir=KNOWLEDGE_DIR)
 
 

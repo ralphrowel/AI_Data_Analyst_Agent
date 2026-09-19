@@ -6,7 +6,8 @@ import pytest
 
 # Never read developer credentials or call external LLMs during tests.
 os.environ.update(APP_ENV='test', ALLOW_DEMO_AUTH='false', GEMINI_API_KEY='', GROQ_API_KEY='',
-                  SUPABASE_URL='https://test.supabase.co', SUPABASE_JWT_SECRET='test-secret-' * 4)
+                  SUPABASE_URL='https://test.supabase.co', SUPABASE_JWT_SECRET='test-secret-' * 4,
+                  SUPABASE_SERVICE_KEY='')
 
 @pytest.fixture(autouse=True)
 def isolated_storage(tmp_path, monkeypatch):

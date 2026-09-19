@@ -121,6 +121,11 @@ def list_datasets(current_user: User = Depends(get_current_user)):
 @router.post("/api/upload", response_model=UploadResponse)
 def upload_file(req: UploadDatasetRequest, current_user: User = Depends(get_current_user)):
     """Upload a CSV dataset privately scoped to the user or a knowledge document for RAG."""
+    if current_user.id == "user_default":
+        raise HTTPException(
+            status_code=403,
+            detail="Guest accounts cannot upload private datasets. Please sign in with Google or Email to upload your own files."
+        )
     filename = req.filename
     if len(req.content.encode("utf-8")) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "Upload exceeds size limit")

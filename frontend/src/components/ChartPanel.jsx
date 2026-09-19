@@ -20,7 +20,7 @@ export default function ChartPanel({ charts, currentIndex, onIndexChange }) {
   const chartCount = charts.filter(Boolean).length;
 
   return (
-    <aside className="w-96 shrink-0 border-l border-surface-200 dark:border-gray-700 bg-surface-50 dark:bg-gray-900 flex flex-col">
+    <aside data-tour="chart-panel" className="w-96 shrink-0 border-l border-surface-200 dark:border-gray-700 bg-surface-50 dark:bg-gray-900 flex flex-col">
       <div className="p-4 border-b border-surface-200 dark:border-gray-700 flex items-center justify-between">
         <h3 className="text-sm font-medium text-surface-600 dark:text-gray-300">
           Charts <span className="text-surface-400 dark:text-gray-500 font-normal">({chartCount})</span>

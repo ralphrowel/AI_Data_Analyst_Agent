@@ -20,20 +20,36 @@ class QuotaManager:
     def _today_utc(self):
         return datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
+    GUEST_LIMIT = 10000
+
+    def _get_limit(self, user_id: str) -> int:
+        return self.GUEST_LIMIT if user_id == "user_default" else self.default_limit
+
     def _get_entry(self, user_id):
         from backend.app import storage
-        return storage.get('quotas', user_id, self._today_utc()) or {'date': self._today_utc(), 'tokens_used': 0, 'daily_limit': self.default_limit}
+        entry = storage.get('quotas', user_id, self._today_utc())
+        limit = self._get_limit(user_id)
+        if not entry:
+            return {'date': self._today_utc(), 'tokens_used': 0, 'daily_limit': limit}
+        entry['daily_limit'] = limit
+        return entry
 
     def check_quota(self, user_id: str, limit: Optional[int] = None) -> bool:
         """Check if user has remaining tokens. Raises HTTP 429 if budget exceeded."""
         entry = self._get_entry(user_id)
-        max_allowed = limit if limit is not None else entry.get("daily_limit", self.default_limit)
+        max_allowed = limit if limit is not None else entry.get("daily_limit", self._get_limit(user_id))
         used = entry.get("tokens_used", 0)
 
         if used >= max_allowed:
+            is_guest = (user_id == "user_default")
+            msg = (
+                "You've reached your free guest demo limit. Sign in with Google or Email to unlock 50,000 daily tokens and custom dataset uploads."
+                if is_guest
+                else f"Daily free token budget reached ({max_allowed:,} tokens). Resets at midnight UTC."
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Daily free token budget reached ({max_allowed:,} tokens). Resets at midnight UTC.",
+                detail=msg,
                 headers={"Retry-After": "86400"},
             )
         return True
@@ -45,8 +61,10 @@ class QuotaManager:
 
         from backend.app import storage
         day = self._today_utc()
+        limit = self._get_limit(user_id)
         with storage.transaction('quotas', user_id, day) as conn:
-            entry = storage.get('quotas', user_id, day, conn) or {'date': day, 'tokens_used': 0, 'daily_limit': self.default_limit}
+            entry = storage.get('quotas', user_id, day, conn) or {'date': day, 'tokens_used': 0, 'daily_limit': limit}
+            entry['daily_limit'] = limit
             entry['tokens_used'] += tokens
             storage.put('quotas', user_id, day, entry, conn)
             return entry['tokens_used']
