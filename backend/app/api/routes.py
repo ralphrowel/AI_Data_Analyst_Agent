@@ -29,7 +29,7 @@ from backend.app.legacy.query_planner import get_query_plan, get_summary
 from backend.app.legacy.query_executor import execute_plan
 from backend.app.memory.session_store import default_session_store
 from backend.app.data_engine.dataset_manager import default_dataset_manager
-from backend.app.auth.supabase_auth import get_current_user, get_optional_user, User
+from backend.app.auth.supabase_auth import get_current_user, User
 from backend.app.auth.quota_manager import default_quota_manager
 
 
@@ -100,7 +100,9 @@ def upload_file(req: UploadDatasetRequest, current_user: User = Depends(get_curr
 
         try:
             from backend.app.paths import atomic_text
-            atomic_text(target_path, req.content)
+            from backend.app import storage as db
+            with db.transaction('dataset_files', current_user.id, filename):
+                atomic_text(target_path, req.content)
 
             # Invalidate caches so newly uploaded dataset is available immediately
             default_dataset_manager.invalidate_cache(filename, user_id=current_user.id)

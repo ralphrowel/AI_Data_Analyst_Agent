@@ -2,9 +2,11 @@
 import os
 from contextlib import contextmanager
 from functools import lru_cache
+from contextvars import ContextVar
 from sqlalchemy import create_engine, MetaData, Table, Column, String, JSON, select
 
 metadata = MetaData()
+_connection = ContextVar('storage_connection', default=None)
 records = Table('app_records', metadata,
     Column('kind', String, primary_key=True),
     Column('owner', String, primary_key=True),
@@ -42,14 +44,27 @@ def initialize():
 @contextmanager
 def transaction(kind, owner, key):
     """Serialize updates to a record, including first creation, across workers."""
+    current = _connection.get()
+    if current is not None:
+        _lock(current, kind, owner, key)
+        yield current
+        return
     with engine().begin() as conn:
-        if conn.dialect.name == 'postgresql':
-            from sqlalchemy import text
-            conn.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))'),
-                         {'key': f'{kind}:{owner}:{key}'})
-        yield conn
+        _lock(conn, kind, owner, key)
+        token = _connection.set(conn)
+        try:
+            yield conn
+        finally:
+            _connection.reset(token)
+
+def _lock(conn, kind, owner, key):
+    if conn.dialect.name == 'postgresql':
+        from sqlalchemy import text
+        conn.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))'),
+                     {'key': f'{kind}:{owner}:{key}'})
 
 def get(kind, owner, key, conn=None):
+    conn = conn if conn is not None else _connection.get()
     stmt = select(records.c.payload).where(records.c.kind == kind, records.c.owner == owner, records.c.key == key)
     if conn is not None:
         return conn.execute(stmt).scalar_one_or_none()
@@ -70,6 +85,8 @@ def list_records(kind, owner=None):
     stmt = select(records.c.payload).where(records.c.kind == kind)
     if owner is not None:
         stmt = stmt.where(records.c.owner == owner)
+    if _connection.get() is not None:
+        return list(_connection.get().execute(stmt).scalars())
     with engine().connect() as conn:
         return list(conn.execute(stmt).scalars())
 
@@ -77,6 +94,8 @@ def find(kind, key, owner=None):
     stmt = select(records.c.payload).where(records.c.kind == kind, records.c.key == key)
     if owner is not None:
         stmt = stmt.where(records.c.owner == owner)
+    if _connection.get() is not None:
+        return _connection.get().execute(stmt).scalar_one_or_none()
     with engine().connect() as conn:
         return conn.execute(stmt).scalar_one_or_none()
 

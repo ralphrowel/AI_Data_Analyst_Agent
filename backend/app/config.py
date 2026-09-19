@@ -23,8 +23,15 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_DATASET_PATH = RAW_DATA_DIR / "netflix_titles.csv"
 
 # API keys
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Gemini supports multiple keys for quota rotation (use different Google accounts)
+_raw_gemini_keys = [
+    os.getenv("GEMINI_API_KEY", ""),
+    os.getenv("GEMINI_API_KEY_2", ""),
+]
+GEMINI_API_KEYS: list[str] = [k for k in _raw_gemini_keys if k.strip()]
+GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ""  # backward compat
 
 # Supabase Auth configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")

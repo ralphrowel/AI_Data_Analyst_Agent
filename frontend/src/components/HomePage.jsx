@@ -91,7 +91,7 @@ export default function HomePage({
           {/* Active Model Pill */}
           <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-[10px] font-mono text-surface-600 dark:text-gray-300">
             <span className="font-semibold text-accent">Model:</span>
-            <span>{selectedModel === "groq" ? "Groq 70B" : "Gemini 2.5"}</span>
+            <span>{selectedModel === "groq" ? "Groq" : "Gemini"}</span>
           </div>
 
           {/* New Chat Button */}

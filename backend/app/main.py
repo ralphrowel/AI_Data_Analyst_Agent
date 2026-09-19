@@ -49,7 +49,8 @@ async def validation_error(request, exc):
 @app.exception_handler(Exception)
 async def server_error(request, exc):
     logging.getLogger(__name__).error('Request failed: %s', type(exc).__name__)
-    return JSONResponse({'detail': 'Internal server error'}, status_code=500)
+    return JSONResponse({'detail': 'Internal server error'}, status_code=500,
+                        headers={'X-Request-ID': getattr(request.state, 'request_id', '')})
 
 if __name__ == "__main__":
     import uvicorn

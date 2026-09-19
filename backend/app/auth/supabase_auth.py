@@ -8,6 +8,7 @@ import httpx
 from pydantic import BaseModel
 from fastapi import Request, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.concurrency import run_in_threadpool
 
 from backend.app.config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET
 
@@ -76,9 +77,9 @@ def _decode_jwt_token(token: str) -> User:
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     if not credentials or not credentials.credentials:
         raise HTTPException(status_code=401, detail='Authentication required', headers={'WWW-Authenticate': 'Bearer'})
-    user = _decode_jwt_token(credentials.credentials.strip())
+    user = await run_in_threadpool(_decode_jwt_token, credentials.credentials.strip())
     from backend.app import storage
-    storage.put('users', user.id, user.id, user.model_dump())
+    await run_in_threadpool(storage.put, 'users', user.id, user.id, user.model_dump())
     from backend.app.auth.context import request_user_id
     context_token = request_user_id.set(user.id)
     try:

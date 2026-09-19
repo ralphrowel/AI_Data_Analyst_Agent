@@ -12,7 +12,7 @@ import {
   fetchUserQuota,
   setAuthToken,
 } from "../api";
-import { supabase, isSupabaseConfigured, DEMO_ACCOUNTS, demoAuthEnabled } from "../supabase";
+import { supabase, isSupabaseConfigured } from "../supabase";
 import Sidebar from "./Sidebar";
 import ChatPanel from "./ChatPanel";
 import ChartPanel from "./ChartPanel";

@@ -1,10 +1,25 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 import pandas as pd
-from backend.app.paths import inside, filename
+from backend.app.paths import inside, filename, atomic_text
 from backend.app import storage
 from backend.app.config import RAW_DATA_DIR, UPLOADS_DIR, DEFAULT_DATASET_PATH
 from backend.app.data_engine.loader import load_data, describe_dataframe
+
+def serialize_edit(method):
+    """Serialize file read-modify-write operations across PostgreSQL workers."""
+    from functools import wraps
+    from inspect import signature
+    @wraps(method)
+    def wrapped(*args, **kwargs):
+        bound = signature(method).bind(*args, **kwargs)
+        owner = bound.arguments.get('user_id')
+        if not owner:
+            raise ValueError('User required for mutations')
+        name = filename(bound.arguments.get('name') or DEFAULT_DATASET_PATH.name)
+        with storage.transaction('dataset_files', owner, name):
+            return method(*args, **kwargs)
+    return wrapped
 
 
 class DatasetManager:
@@ -196,6 +211,7 @@ class DatasetManager:
             "total_pages": total_pages,
         }
 
+    @serialize_edit
     def update_cells(self, name: Optional[str], updates: List[dict], user_id: Optional[str] = None) -> dict:
         """Update cell values in the in-memory dataset, sync with disk and description cache."""
         df = self.get_dataset(name, user_id=user_id)
@@ -225,13 +241,14 @@ class DatasetManager:
                     updated_count += 1
 
         file_path = self._write_path(name, user_id)
-        df.to_csv(file_path, index=False)
+        atomic_text(file_path, df.to_csv(index=False))
         key = self._cache_key(name, user_id)
         self._desc_cache[key] = describe_dataframe(df)
         self.log_activity(name, "cell_update", f"Updated {updated_count} cells in {name}", {"updated_count": updated_count}, user_id=user_id)
 
         return {"success": True, "updated_count": updated_count}
 
+    @serialize_edit
     def add_row(self, name: Optional[str], row_data: dict, user_id: Optional[str] = None) -> dict:
         """Add a new row to the dataset and save."""
         df = self.get_dataset(name, user_id=user_id)
@@ -243,13 +260,14 @@ class DatasetManager:
         new_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         self._cache[key] = new_df
         file_path = self._write_path(name, user_id)
-        new_df.to_csv(file_path, index=False)
+        atomic_text(file_path, new_df.to_csv(index=False))
         self._desc_cache[key] = describe_dataframe(new_df)
         new_idx = int(len(new_df) - 1)
         self.log_activity(name, "add_row", f"Appended record #{new_idx + 1} to {name}", {"new_index": new_idx}, user_id=user_id)
 
         return {"success": True, "new_index": new_idx}
 
+    @serialize_edit
     def delete_row(self, name: Optional[str], row_index: int, user_id: Optional[str] = None) -> dict:
         """Delete a row by index from the dataset and save."""
         df = self.get_dataset(name, user_id=user_id)
@@ -261,7 +279,7 @@ class DatasetManager:
             new_df = df.drop(index=row_index).reset_index(drop=True)
             self._cache[key] = new_df
             file_path = self._write_path(name, user_id)
-            new_df.to_csv(file_path, index=False)
+            atomic_text(file_path, new_df.to_csv(index=False))
             self._desc_cache[key] = describe_dataframe(new_df)
             self.log_activity(name, "delete_row", f"Deleted row #{row_index + 1} from {name}", {"row_index": row_index}, user_id=user_id)
             return {"success": True}

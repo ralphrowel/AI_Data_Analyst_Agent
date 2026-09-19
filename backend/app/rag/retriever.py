@@ -56,10 +56,17 @@ class DocumentRetriever:
         return results
 
 
-# Global singleton retriever instance
-default_retriever = DocumentRetriever()
-
 def get_user_retriever(user_id):
     from backend.app.config import KNOWLEDGE_DIR
     from backend.app.paths import inside
-    return DocumentRetriever(DocumentIndexer(inside(KNOWLEDGE_DIR, user_id)))
+    class UserIndexer(DocumentIndexer):
+        def load_documents(self):
+            documents = {d['filename']: d for d in super().load_documents()}
+            # Only these bundled public reference documents are shared. Legacy
+            # uploads in the global directory are never implicitly made public.
+            for name in ('methodology_notes.md', 'netflix_data_dictionary.md'):
+                path = inside(KNOWLEDGE_DIR, name)
+                if name not in documents and path.is_file():
+                    documents[name] = {'filename': name, 'content': path.read_text(encoding='utf-8')}
+            return list(documents.values())
+    return DocumentRetriever(UserIndexer(inside(KNOWLEDGE_DIR, user_id)))

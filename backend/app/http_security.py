@@ -21,6 +21,7 @@ class RequestBoundary:
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
         request_id = uuid.uuid4().hex
+        scope.setdefault('state', {})['request_id'] = request_id
         started = time.monotonic()
         status = 500
         # JSON can encode a UTF-8 character as six ASCII escape bytes.

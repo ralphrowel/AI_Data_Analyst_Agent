@@ -90,3 +90,22 @@ def test_invalid_csv_preserves_existing_upload(client,auth):
     assert client.post('/api/upload',headers=auth,json={'filename':'a.csv','content':'col\n1\n'}).status_code == 200
     assert client.post('/api/upload',headers=auth,json={'filename':'a.csv','content':'\n'}).status_code == 422
     assert client.get('/api/datasets/a.csv/rows',headers=auth).json()['rows'][0]['col'] == 1
+
+def test_every_api_route_requires_auth(client):
+    from backend.app.main import app
+    for route in app.routes:
+        path=getattr(route,'path','')
+        if not path.startswith('/api/'): continue
+        import re
+        path=re.sub(r'\{[^}]+\}','test',path)
+        for method in route.methods - {'HEAD','OPTIONS'}:
+            response=client.request(method,path)
+            assert response.status_code == 401,(method,path,response.text)
+
+@pytest.mark.parametrize('missing',['exp','iat','iss','aud','sub'])
+def test_required_claims(client,token,missing):
+    import os
+    claims=jwt.decode(token(),os.environ['SUPABASE_JWT_SECRET'],algorithms=['HS256'],audience='authenticated')
+    claims.pop(missing)
+    invalid=jwt.encode(claims,os.environ['SUPABASE_JWT_SECRET'],algorithm='HS256')
+    assert client.get('/api/auth/me',headers={'Authorization':'Bearer '+invalid}).status_code == 401

@@ -3,7 +3,7 @@ from pathlib import Path
 
 def filename(value: str) -> str:
     if (not value or value != value.strip() or Path(value).name != value
-        or any(c in value for c in '/\\:\x00') or value in {'.', '..'}
+        or any(c in value for c in '/\\:\x00<>"|?*') or any(ord(c) < 32 for c in value) or value in {'.', '..'}
         or value.endswith(('.', ' ')) or len(value) > 200
         or value.split('.')[0].upper() in {'CON', 'PRN', 'AUX', 'NUL', *[f'COM{i}' for i in range(10)], *[f'LPT{i}' for i in range(10)]}):
         raise ValueError('Invalid filename')

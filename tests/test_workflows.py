@@ -54,3 +54,12 @@ def test_quota_guard(client,auth):
     from backend.app.auth.quota_manager import default_quota_manager
     default_quota_manager.record_usage('alice', default_quota_manager.default_limit)
     assert client.post('/api/ask',headers=auth,json={'question':'Count rows'}).status_code == 429
+
+def test_rag_public_references_and_private_overrides(tmp_path):
+    from backend.app import config
+    from backend.app.tools.rag_tools import search_documents
+    config.KNOWLEDGE_DIR.mkdir()
+    (config.KNOWLEDGE_DIR/'methodology_notes.md').write_text('Shared reference explains normalization.')
+    (config.KNOWLEDGE_DIR/'old_upload.md').write_text('Legacy confidential quasar account.')
+    assert search_documents('normalization',user_id='bob')
+    assert search_documents('quasar',user_id='bob') == []

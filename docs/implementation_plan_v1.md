@@ -92,7 +92,7 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 - **Implemented:**
   - `indexer.py`: Scans `data/knowledge/`, parses markdown & text documents, generates structured `DocumentChunk` passages with titles, and builds normalized TF-IDF vector representations with sublinear scaling.
   - `retriever.py`: `DocumentRetriever` computes in-memory cosine similarity over chunk vectors using numpy dot-product scoring, ranking passages with confidence scores.
-  - `rag_tools.py`: `search_documents(query, top_k)` connected directly to `default_retriever` and registered in `default_registry`.
+  - `rag_tools.py`: `search_documents(query, top_k, user_id)` creates a user-scoped retriever and is registered in `default_registry`.
   - `tools/__init__.py`: Auto-initializes and registers all structured and RAG tools on module import.
   - Verified: `test_rag_step6.py` confirmed 4 comprehensive tests passing:
     1. Document indexer loaded 2 documents, chunked 5 passages, and built a vocabulary of 183 terms.
@@ -120,8 +120,8 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 - **Goal:** Allow users to upload new CSV datasets and unstructured documents directly from the UI.
 - **Implemented:**
   - `routes.py`: Upgraded `POST /api/upload` to support:
-    - `.csv` datasets: stored in `data/raw/`, auto-clears cache, validates rows and columns, and returns dataset stats.
-    - `.md` / `.txt` knowledge documents: stored in `data/knowledge/`, auto-triggers vector index refresh via `default_retriever.refresh()`.
+    - `.csv` datasets: stored in `data/uploads/{user_id}/`, validated before atomic replacement, with metadata persisted in PostgreSQL.
+    - `.md` / `.txt` knowledge documents: stored in `data/knowledge/{user_id}/`, with an isolated index rebuilt for retrieval.
   - `UploadModal.jsx`: Modern drag-and-drop modal with file detection, format validation, progress state, and instant "Start Chat with this Dataset" transition.
   - `Header.jsx`: Added accessible "Upload" button with icon next to the active dataset badge.
   - `App.jsx`: Fully wired upload modal, state lifecycle, and dataset reloading.
@@ -136,15 +136,15 @@ Based on the System Change Proposal, Tokenization Notes, and the new IDE-style m
 - **Goal:** Authenticate users with Google 1-Click / Email OTP via Supabase, scope chat workspaces & datasets privately per user, and enforce a daily per-client token allowance (50,000 tokens/day) to prevent server quota exhaustion.
 - **Implemented:**
   - **Backend Auth & Quota Layer:**
-    - `backend/app/auth/supabase_auth.py`: FastAPI dependency validating Supabase JWT tokens (`get_current_user`, `get_optional_user`) with support for live JWT verification and zero-config demo accounts.
-    - `backend/app/auth/quota_manager.py`: Daily UTC-resetting per-client token quota manager (`check_quota`, `record_usage`, `get_user_quota`) backed by `data/quotas.json`.
+    - `backend/app/auth/supabase_auth.py`: Mandatory authentication validates signatures, issuer, audience, expiry, issued-at and authenticated role. Demo accounts require an explicit development-only flag.
+    - `backend/app/auth/quota_manager.py`: Daily UTC-resetting token quota manager backed by PostgreSQL, with transactional increments across workers.
     - `backend/app/memory/session_store.py`: `ChatSession` and `SessionStore` scoped strictly by `user_id`.
     - `backend/app/data_engine/dataset_manager.py`: Multi-tenant dataset isolation separating global public datasets from private user uploads under `data/uploads/{user_id}/`.
     - `backend/app/api/routes.py`: Secured `/api/sessions`, `/api/upload`, `/api/datasets`, `/api/auth/me`, `/api/user/quota`, and `/api/ask` (HTTP 429 quota guard triggered before LLM execution, atomic quota increment upon completion).
   - **Frontend Integration:**
     - Installed `@supabase/supabase-js`.
     - `frontend/src/supabase.js`: Configured client with live Supabase credentials and built-in demo profiles (Alice & Bob).
-    - `frontend/src/components/AuthModal.jsx`: Modal supporting Google 1-Click login, Email OTP/magic link, and zero-config profile switching.
+    - `frontend/src/components/AuthModal.jsx`: Google and email login; profile switching is available only with the explicit development demo flag.
     - `frontend/src/components/Header.jsx`: Added user identity badge and live token quota allowance progress bar.
     - `frontend/src/components/HomePage.jsx`: Added user identity pill and daily token quota indicator in top navigation.
     - `frontend/src/api.js`: Automatic `Authorization: Bearer <token>` injection across all endpoints and friendly 429 error handling.
