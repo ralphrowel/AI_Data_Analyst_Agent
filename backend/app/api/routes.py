@@ -71,6 +71,47 @@ def get_user_quota(current_user: User = Depends(get_current_user)):
 
 # --- Datasets Endpoints ---
 
+from backend.app.auth.quota_manager import default_quota_manager
+
+
+router = APIRouter()
+
+client = get_gemini_client()
+
+# Cache suggestions per dataset name and user
+_suggestions_cache: dict = {}
+
+SUGGESTION_PROMPT = """You are a data analyst. Based on this dataset description, generate exactly 4 example questions a user might want to ask. They should be diverse, practical, and demonstrate different analysis types (counting, top N, aggregation, filtering). Return ONLY a JSON array of 4 strings, no explanation.
+
+Dataset:
+{data_description}"""
+
+
+@router.get("/")
+def health_check():
+    return {"status": "Visiq AI Data Analyst API is running", "architecture": "modular"}
+
+
+# --- Auth & Quota Endpoints ---
+
+@router.get("/api/auth/me")
+def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    """Return profile and daily token quota information for authenticated user."""
+    quota = default_quota_manager.get_user_quota(current_user.id)
+    return {
+        "user": current_user.model_dump(),
+        "quota": quota,
+    }
+
+
+@router.get("/api/user/quota", response_model=UserQuotaResponse)
+def get_user_quota(current_user: User = Depends(get_current_user)):
+    """Retrieve daily token quota usage and remaining allowance for the current user."""
+    return default_quota_manager.get_user_quota(current_user.id)
+
+
+# --- Datasets Endpoints ---
+
 @router.get("/api/datasets", response_model=List[DatasetInfo])
 def list_datasets(current_user: User = Depends(get_current_user)):
     """List all available datasets (global + private user uploads)."""
@@ -93,16 +134,11 @@ def upload_file(req: UploadDatasetRequest, current_user: User = Depends(get_curr
             pd.read_csv(io.StringIO(req.content))
         except (pd.errors.ParserError, pd.errors.EmptyDataError, ValueError):
             raise HTTPException(422, "Invalid CSV dataset")
-        # Save privately in user-scoped upload folder
-        target_dir = inside(default_dataset_manager.uploads_dir, current_user.id)
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_path = inside(default_dataset_manager.uploads_dir, current_user.id, filename)
-
         try:
-            from backend.app.paths import atomic_text
+            from backend.app.file_storage import file_store
             from backend.app import storage as db
             with db.transaction('dataset_files', current_user.id, filename):
-                atomic_text(target_path, req.content)
+                target_path = file_store.save(current_user.id, filename, req.content, kind="csv")
 
             # Invalidate caches so newly uploaded dataset is available immediately
             default_dataset_manager.invalidate_cache(filename, user_id=current_user.id)
@@ -129,12 +165,10 @@ def upload_file(req: UploadDatasetRequest, current_user: User = Depends(get_curr
             raise HTTPException(status_code=500, detail="Request could not be processed")
 
     elif lower_name.endswith((".md", ".txt")):
-        target_path = inside(KNOWLEDGE_DIR, current_user.id, filename)
         try:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            from backend.app.paths import atomic_text
-            atomic_text(target_path, req.content)
+            from backend.app.file_storage import file_store
             from backend.app import storage
+            target_path = file_store.save(current_user.id, filename, req.content, kind="doc")
             storage.put('knowledge', current_user.id, filename,
                         {'name': filename, 'size_bytes': target_path.stat().st_size})
 

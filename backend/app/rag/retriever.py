@@ -62,6 +62,15 @@ def get_user_retriever(user_id):
     class UserIndexer(DocumentIndexer):
         def load_documents(self):
             documents = {d['filename']: d for d in super().load_documents()}
+            try:
+                from backend.app.file_storage import file_store
+                for doc_path in file_store.list_files(user_id, kind="doc"):
+                    if doc_path.name not in documents:
+                        content = file_store.load(user_id, doc_path.name, kind="doc")
+                        if content:
+                            documents[doc_path.name] = {'filename': doc_path.name, 'content': content}
+            except Exception:
+                pass
             # Only these bundled public reference documents are shared. Legacy
             # uploads in the global directory are never implicitly made public.
             for name in ('methodology_notes.md', 'netflix_data_dictionary.md'):

@@ -39,6 +39,13 @@ class DatasetManager:
         """Resolve file path: checks user's private upload folder first, then global raw data."""
         name = filename(name or DEFAULT_DATASET_PATH.name)
         if user_id:
+            try:
+                from backend.app.file_storage import file_store
+                p = file_store.ensure_local_path(user_id, name, kind="csv")
+                if p and p.exists():
+                    return p
+            except Exception:
+                pass
             private = inside(self.uploads_dir, user_id, name)
             if private.exists(): return private
         shared = inside(self.raw_data_dir, name)
@@ -76,24 +83,35 @@ class DatasetManager:
 
         # 1. User private uploads
         if user_id:
+            user_files = set()
             user_dir = inside(self.uploads_dir, user_id)
             if user_dir.exists():
-                for file_path in sorted(user_dir.glob("*.csv")):
-                    try:
-                        stat = file_path.stat()
-                        df = self.get_dataset(file_path.name, user_id=user_id)
-                        mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
-                        datasets.append({
-                            "name": file_path.name,
-                            "rows": int(len(df)),
-                            "columns": int(len(df.columns)),
-                            "size_bytes": int(stat.st_size),
-                            "modified_at": mtime_iso,
-                            "is_private": True,
-                        })
-                        seen_names.add(file_path.name)
-                    except Exception:
-                        pass
+                for file_path in user_dir.glob("*.csv"):
+                    user_files.add(file_path.name)
+            try:
+                from backend.app.file_storage import file_store
+                for file_path in file_store.list_files(user_id, kind="csv"):
+                    user_files.add(file_path.name)
+            except Exception:
+                pass
+
+            for fname in sorted(user_files):
+                try:
+                    p = self._resolve_path(fname, user_id=user_id)
+                    stat = p.stat()
+                    df = self.get_dataset(fname, user_id=user_id)
+                    mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+                    datasets.append({
+                        "name": fname,
+                        "rows": int(len(df)),
+                        "columns": int(len(df.columns)),
+                        "size_bytes": int(stat.st_size),
+                        "modified_at": mtime_iso,
+                        "is_private": True,
+                    })
+                    seen_names.add(fname)
+                except Exception:
+                    pass
 
         # 2. Global shared datasets
         if self.raw_data_dir.exists():
