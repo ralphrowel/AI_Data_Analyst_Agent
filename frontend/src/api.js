@@ -1,4 +1,16 @@
-const BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, "");
+function getApiBaseUrl() {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof window !== "undefined") {
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (!isLocalhost && envUrl && (envUrl.includes("localhost") || envUrl.includes("127.0.0.1"))) {
+      console.warn("VITE_API_BASE_URL points to localhost in a production deployment; falling back to origin.");
+      return window.location.origin.replace(/\/$/, "");
+    }
+  }
+  return (envUrl || (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "");
+}
+
+const BASE = getApiBaseUrl();
 
 let currentAuthToken = localStorage.getItem("visiq_auth_token") || null;
 

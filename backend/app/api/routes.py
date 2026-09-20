@@ -69,45 +69,7 @@ def get_user_quota(current_user: User = Depends(get_current_user)):
     return default_quota_manager.get_user_quota(current_user.id)
 
 
-# --- Datasets Endpoints ---
 
-from backend.app.auth.quota_manager import default_quota_manager
-
-
-router = APIRouter()
-
-client = get_gemini_client()
-
-# Cache suggestions per dataset name and user
-_suggestions_cache: dict = {}
-
-SUGGESTION_PROMPT = """You are a data analyst. Based on this dataset description, generate exactly 4 example questions a user might want to ask. They should be diverse, practical, and demonstrate different analysis types (counting, top N, aggregation, filtering). Return ONLY a JSON array of 4 strings, no explanation.
-
-Dataset:
-{data_description}"""
-
-
-@router.get("/")
-def health_check():
-    return {"status": "Visiq AI Data Analyst API is running", "architecture": "modular"}
-
-
-# --- Auth & Quota Endpoints ---
-
-@router.get("/api/auth/me")
-def get_current_user_profile(current_user: User = Depends(get_current_user)):
-    """Return profile and daily token quota information for authenticated user."""
-    quota = default_quota_manager.get_user_quota(current_user.id)
-    return {
-        "user": current_user.model_dump(),
-        "quota": quota,
-    }
-
-
-@router.get("/api/user/quota", response_model=UserQuotaResponse)
-def get_user_quota(current_user: User = Depends(get_current_user)):
-    """Retrieve daily token quota usage and remaining allowance for the current user."""
-    return default_quota_manager.get_user_quota(current_user.id)
 
 
 # --- Datasets Endpoints ---
@@ -516,7 +478,11 @@ def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)
         if not session:
             raise HTTPException(status_code=404, detail="Workspace session not found or belongs to another user")
     else:
-        session = default_session_store.ensure_default_session(user_id=current_user.id)
+        session = (
+            default_session_store.ensure_guest_demo_session(user_id=current_user.id)
+            if current_user.id == "user_default"
+            else default_session_store.ensure_default_session(user_id=current_user.id)
+        )
         request.session_id = session.session_id
 
     # Safety feature flag: fallback to legacy agent if explicitly enabled in .env

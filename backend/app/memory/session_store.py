@@ -89,6 +89,16 @@ class SessionStore:
                 storage.put('sessions', user_id, key, row, conn)
             return restore_session(row)
 
+    def ensure_guest_demo_session(self, user_id='user_default'):
+        key = 'demo_guest_netflix'
+        with storage.transaction('sessions', user_id, key) as conn:
+            row = storage.get('sessions', user_id, key, conn)
+            if row is None:
+                session = ChatSession(key, 'Netflix Catalog Analysis', DEFAULT_DATASET_PATH.name, user_id)
+                row = vars(session)
+                storage.put('sessions', user_id, key, row, conn)
+            return restore_session(row)
+
     def create_session(self, dataset_name=None, title=None, user_id='user_default'):
         name = dataset_name or DEFAULT_DATASET_PATH.name
         session = ChatSession(str(uuid.uuid4()), title or f'Analysis of {name}', name, user_id)
@@ -99,11 +109,22 @@ class SessionStore:
         if not session_id: return None
         owner = request_user_id.get() or user_id
         row = storage.find('sessions', session_id, owner)
-        return restore_session(row) if row else None
+        if row is None:
+            if session_id == 'demo_guest_netflix':
+                return self.ensure_guest_demo_session(user_id=owner or 'user_default')
+            if session_id == f'default_session_{owner}':
+                return self.ensure_default_session(user_id=owner or 'user_default')
+            return None
+        return restore_session(row)
 
     def list_sessions(self, user_id=None):
         owner = request_user_id.get() or user_id
-        return [restore_session(r).to_dict() for r in storage.list_records('sessions', owner)]
+        sessions = [restore_session(r).to_dict() for r in storage.list_records('sessions', owner)]
+        if owner == 'user_default':
+            if not any(s.get('dataset_name') == 'netflix_titles.csv' for s in sessions):
+                demo = self.ensure_guest_demo_session(user_id=owner)
+                sessions = [demo.to_dict(), *sessions]
+        return sessions
 
     def delete_session(self, session_id, user_id=None):
         session = self.get_session(session_id, user_id)

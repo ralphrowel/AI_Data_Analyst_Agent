@@ -36,6 +36,26 @@ const DEFAULT_TOKEN_USAGE = {
 
 const MAX_GUEST_QUERIES = 5;
 
+const DEFAULT_GUEST_SESSION = {
+  session_id: "demo_guest_netflix",
+  dataset_name: "netflix_titles.csv",
+  title: "Netflix Catalog Analysis",
+  created_at: new Date().toISOString(),
+  message_count: 0,
+  widget_count: 0,
+  token_usage: { ...DEFAULT_TOKEN_USAGE },
+  last_message: "",
+};
+
+const DEFAULT_NETFLIX_DATASET = {
+  name: "netflix_titles.csv",
+  filename: "netflix_titles.csv",
+  rows: 8807,
+  columns: 14,
+  size_bytes: 3443996,
+  is_private: false,
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -55,10 +75,34 @@ export default function App() {
     return Number(localStorage.getItem("visiq_guest_queries") || 0);
   });
 
-  const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sessions, setSessions] = useState(() => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      if (savedUser?.isGuest) {
+        return [DEFAULT_GUEST_SESSION];
+      }
+    } catch {}
+    return [];
+  });
+  const [activeSessionId, setActiveSessionId] = useState(() => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      if (savedUser?.isGuest) {
+        return localStorage.getItem("activeSessionId") || "demo_guest_netflix";
+      }
+    } catch {}
+    return localStorage.getItem("activeSessionId") || null;
+  });
   const [activeTab, setActiveTab] = useState("chat");
-  const [availableDatasets, setAvailableDatasets] = useState([]);
+  const [availableDatasets, setAvailableDatasets] = useState(() => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      if (savedUser?.isGuest) {
+        return [DEFAULT_NETFLIX_DATASET];
+      }
+    } catch {}
+    return [];
+  });
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [messages, setMessages] = useState([]);
 
@@ -108,9 +152,19 @@ export default function App() {
 
   const loadDatasets = useCallback(() => {
     fetchDatasets()
-      .then((data) => setAvailableDatasets(data))
-      .catch(() => {});
-  }, []);
+      .then((data) => {
+        let list = data || [];
+        if (currentUser?.isGuest && !list.some((d) => d.name === "netflix_titles.csv")) {
+          list = [DEFAULT_NETFLIX_DATASET, ...list];
+        }
+        setAvailableDatasets(list);
+      })
+      .catch(() => {
+        if (currentUser?.isGuest) {
+          setAvailableDatasets([DEFAULT_NETFLIX_DATASET]);
+        }
+      });
+  }, [currentUser]);
 
   // When currentUser changes: synchronize auth token, reload datasets, sessions & quota
   useEffect(() => {
@@ -131,6 +185,23 @@ export default function App() {
       setAuthToken(currentUser.token);
     }
     localStorage.setItem("visiq_current_user", JSON.stringify(currentUser));
+
+    // If guest user, immediately activate Netflix session and chat view so the user never sees a blank screen
+    if (currentUser?.isGuest) {
+      setSessions((prev) =>
+        prev.some((s) => s.dataset_name === "netflix_titles.csv")
+          ? prev
+          : [DEFAULT_GUEST_SESSION, ...prev]
+      );
+      setActiveSessionId((prev) => prev || "demo_guest_netflix");
+      setActiveTab("chat");
+      setAvailableDatasets((prev) =>
+        prev.some((d) => d.name === "netflix_titles.csv")
+          ? prev
+          : [DEFAULT_NETFLIX_DATASET, ...prev]
+      );
+    }
+
     loadDatasets();
 
     fetchSessions()
@@ -144,7 +215,7 @@ export default function App() {
               netflixSession = await createSession("netflix_titles.csv", "Netflix Catalog Analysis");
               list = [netflixSession, ...list];
             } catch (err) {
-              console.error("Failed to auto-create guest session:", err);
+              console.warn("Backend session creation deferred; using local demo session:", err);
             }
           }
           if (netflixSession) {
@@ -152,22 +223,39 @@ export default function App() {
             setActiveSessionId(netflixSession.session_id);
             localStorage.setItem("activeSessionId", netflixSession.session_id);
             setActiveTab("chat");
-
-            // Trigger guided tour for first-time visitors
-            if (!localStorage.getItem("hasSeenTour")) {
-              setTimeout(() => setShowProductTour(true), 700);
-            }
-            return;
+          } else {
+            setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
+            setActiveSessionId((prev) => prev || "demo_guest_netflix");
+            setActiveTab("chat");
           }
+
+          // Trigger guided tour for first-time visitors
+          if (!localStorage.getItem("hasSeenTour")) {
+            setTimeout(() => setShowProductTour(true), 700);
+          }
+          return;
         }
 
         setSessions(list);
-        setActiveSessionId(null);
-        localStorage.removeItem("activeSessionId");
+        if (list.length > 0) {
+          const savedId = localStorage.getItem("activeSessionId");
+          const found = list.find((s) => s.session_id === savedId);
+          setActiveSessionId(found ? found.session_id : list[0].session_id);
+        } else {
+          setActiveSessionId(null);
+          localStorage.removeItem("activeSessionId");
+        }
         setMessages([]);
         setCharts([]);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn("Failed to fetch sessions:", err);
+        if (currentUser?.isGuest) {
+          setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
+          setActiveSessionId((prev) => prev || "demo_guest_netflix");
+          setActiveTab("chat");
+        }
+      });
 
     loadQuota();
   }, [currentUser, loadDatasets, loadQuota]);
@@ -229,16 +317,17 @@ export default function App() {
     if (activeSessionId) {
       fetchSessionDetails(activeSessionId)
         .then((details) => {
-          if (details && details.messages) {
-            const formatted = details.messages.map((m) => ({
+          if (details) {
+            const rawMessages = details.messages || details.history || [];
+            const formatted = rawMessages.map((m) => ({
               id: ++messageId,
               role: m.role,
-              text: m.text,
-              operation: m.operation,
-              unsupported_reason: m.unsupported_reason,
-              chart_base64: m.chart_base64,
-              chart_svg: m.chart_svg,
-              chart_spec: m.chart_spec,
+              text: m.text || m.content || "",
+              operation: m.operation || m.metadata?.operation,
+              unsupported_reason: m.unsupported_reason || m.metadata?.unsupported_reason,
+              chart_base64: m.chart_base64 || m.metadata?.chart_base64,
+              chart_svg: m.chart_svg || m.metadata?.chart_svg,
+              chart_spec: m.chart_spec || m.metadata?.chart_spec,
             }));
             setMessages(formatted);
 
@@ -604,6 +693,19 @@ export default function App() {
         canClose={Boolean(currentUser)}
         onUserChanged={(user) => {
           setCurrentUser(user);
+          if (user?.isGuest) {
+            setSessions([DEFAULT_GUEST_SESSION]);
+            setActiveSessionId(DEFAULT_GUEST_SESSION.session_id);
+            localStorage.setItem("activeSessionId", DEFAULT_GUEST_SESSION.session_id);
+            setActiveTab("chat");
+            setAvailableDatasets((prev) =>
+              prev.some((d) => d.name === "netflix_titles.csv")
+                ? prev
+                : [DEFAULT_NETFLIX_DATASET, ...prev]
+            );
+            setMessages([]);
+            setCharts([]);
+          }
         }}
       />
 
