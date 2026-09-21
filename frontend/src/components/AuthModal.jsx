@@ -127,7 +127,9 @@ export default function AuthModal({
           {/* Custom Banner message (e.g. quota limit reached) */}
           {bannerMessage && (
             <div className="mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs leading-relaxed flex items-start gap-2.5">
-              <span className="text-base leading-none">⚠️</span>
+              <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
               <div>
                 <span className="font-semibold block mb-0.5">Demo Limit Notice</span>
                 <span>{bannerMessage}</span>
@@ -137,16 +139,13 @@ export default function AuthModal({
 
           {/* Primary Explore as Guest Card */}
           <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-accent/15 via-accent/5 to-transparent border border-accent/30 shadow-xs">
-            <div className="flex items-start justify-between gap-3 mb-1.5">
-              <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-accent/20 text-accent mb-1">
-                  Instant Access
-                </span>
-                <h4 className="text-sm font-bold text-surface-900 dark:text-white">
-                  Explore as Guest (Instant Demo)
-                </h4>
-              </div>
-              <span className="text-2xl select-none">🚀</span>
+            <div className="mb-1.5">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-accent/20 text-accent mb-1">
+                Instant Access
+              </span>
+              <h4 className="text-sm font-bold text-surface-900 dark:text-white">
+                Explore as Guest (Instant Demo)
+              </h4>
             </div>
             <p className="text-xs text-surface-600 dark:text-gray-300 leading-relaxed mb-3">
               Explore the preloaded <strong>Netflix Catalog dataset (8,800+ titles)</strong>, test automated queries, and generate charts immediately. No account needed.
