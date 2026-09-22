@@ -1,4 +1,5 @@
 import { DEMO_NETFLIX_COLUMNS, DEMO_NETFLIX_ROWS } from "./netflix_demo_data";
+import { executeDemoAnalysis } from "./demo_analyst";
 
 function getApiBaseUrl() {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
@@ -193,25 +194,59 @@ export async function fetchSuggestions(sessionId, provider) {
 }
 
 export async function askQuestion(question, chartType, chartTheme, provider, sessionId) {
-  const res = await fetch(`${BASE}/api/ask`, {
-    method: "POST",
-    headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      question,
-      chart_type: chartType,
-      chart_theme: chartTheme,
-      provider: provider || "groq",
-      session_id: sessionId || null,
-    }),
-  });
-  if (!res.ok) {
-    const err = await safeJson(res, "Failed to get answer").catch(() => ({ detail: "Failed to get answer" }));
-    if (res.status === 429) {
-      throw new Error(err.detail || "Daily token allowance reached (50,000 tokens). Resets at midnight UTC.");
+  try {
+    const res = await fetch(`${BASE}/api/ask`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        question,
+        chart_type: chartType,
+        chart_theme: chartTheme,
+        provider: provider || "groq",
+        session_id: sessionId || null,
+      }),
+    });
+
+    if (!res.ok) {
+      let errorDetail = "";
+      try {
+        const err = await safeJson(res, "Failed to get answer");
+        errorDetail = err.detail || err.message || "";
+      } catch {}
+
+      if (res.status === 429) {
+        throw new Error(errorDetail || "Daily token allowance reached (50,000 tokens). Resets at midnight UTC.");
+      }
+
+      // If in guest mode and backend is offline / returned error, fall back to instant client-side demo analysis
+      const currentUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      if (currentUser?.isGuest || sessionId === "demo_guest_netflix") {
+        console.warn(`Backend returned HTTP ${res.status}. Falling back to instant client-side demo analysis.`);
+        return executeDemoAnalysis(question, chartType, chartTheme, provider);
+      }
+
+      if (!errorDetail) {
+        if (res.status === 404 || res.status === 405) {
+          errorDetail = `Backend API endpoint unreachable (HTTP ${res.status} at ${BASE}). Please ensure VITE_API_BASE_URL is set in your Vercel deployment settings.`;
+        } else if (res.status === 502 || res.status === 503) {
+          errorDetail = `Backend server is waking up or temporarily unavailable (HTTP ${res.status}). Please try again in a few moments.`;
+        } else {
+          errorDetail = `Server returned HTTP ${res.status}: ${res.statusText || "Request failed"}`;
+        }
+      }
+      throw new Error(errorDetail);
     }
-    throw new Error(err.detail || "Failed to get answer");
+
+    return await safeJson(res, "Failed to get answer");
+  } catch (err) {
+    // If network error (e.g. Failed to fetch / offline / CORS)
+    const currentUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+    if (currentUser?.isGuest || sessionId === "demo_guest_netflix") {
+      console.warn("Backend network error. Serving instant demo response:", err.message);
+      return executeDemoAnalysis(question, chartType, chartTheme, provider);
+    }
+    throw err;
   }
-  return safeJson(res, "Failed to get answer");
 }
 
 // In-memory demo fallback for netflix titles when backend is offline or disconnected
