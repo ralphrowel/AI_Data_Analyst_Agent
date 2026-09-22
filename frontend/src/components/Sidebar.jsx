@@ -17,24 +17,26 @@ export default function Sidebar({
         } shrink-0 border-r border-surface-200 dark:border-gray-700 bg-surface-100 dark:bg-gray-950 flex flex-col transition-all duration-200 h-full select-none`}
     >
       {/* Header */}
-      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} p-3 border-b border-surface-200 dark:border-gray-700`}>
-        {!collapsed ? (
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white font-bold text-[10px] tracking-wider shadow-xs">
-              V
-            </div>
+      <div
+        className={`border-b border-surface-200 dark:border-gray-700 transition-all ${
+          collapsed
+            ? "flex flex-col items-center justify-center gap-2 py-3 px-1"
+            : "flex items-center justify-between px-3 py-2.5"
+        }`}
+      >
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white font-bold text-xs shadow-xs shrink-0">
+            V
+          </div>
+          {!collapsed && (
             <span className="text-sm font-bold text-surface-900 dark:text-gray-100 tracking-tight">
               Visiq
             </span>
-          </div>
-        ) : (
-          <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white font-bold text-xs shadow-xs mb-1">
-            V
-          </div>
-        )}
+          )}
+        </div>
         <button
           onClick={onToggle}
-          className="p-1.5 rounded-md text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+          className="p-1.5 rounded-md text-surface-500 dark:text-gray-400 hover:text-surface-700 dark:hover:text-gray-200 hover:bg-surface-200 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
