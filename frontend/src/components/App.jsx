@@ -128,7 +128,7 @@ export default function App() {
   );
 
   const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
-  const activeDatasetName = activeSession?.dataset_name || null;
+  const activeDatasetName = activeSession?.dataset_name || (currentUser?.isGuest ? "netflix_titles.csv" : null);
   const guestQueriesRemaining = Math.max(0, MAX_GUEST_QUERIES - guestQueriesCount);
 
   // Dark mode effect
@@ -665,8 +665,10 @@ export default function App() {
               </div>
             ) : activeTab === "spreadsheet" ? (
               <SpreadsheetPanel
-                activeDatasetName={activeDatasetName}
-                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName)}
+                datasetName={activeDatasetName || "netflix_titles.csv"}
+                activeDatasetName={activeDatasetName || "netflix_titles.csv"}
+                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName) || availableDatasets[0]}
+                onDatasetUpdated={loadDatasets}
               />
             ) : (
               <DashboardPanel
