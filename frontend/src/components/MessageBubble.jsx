@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import ChartZoomModal from "./ChartZoomModal";
 import InteractiveChart from "./InteractiveChart";
 
@@ -45,7 +46,51 @@ export default function MessageBubble({ message, onPinToDashboard }) {
             : "bg-surface-100 dark:bg-gray-800 text-surface-800 dark:text-gray-100 rounded-bl-md border border-surface-200 dark:border-gray-700"
         }`}
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+        {isUser ? (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+        ) : (
+          <div className="text-sm leading-relaxed space-y-2">
+            <ReactMarkdown
+              components={{
+                h1: ({ node, ...props }) => (
+                  <h1 className="text-base font-bold text-surface-900 dark:text-white mt-1 mb-1.5" {...props} />
+                ),
+                h2: ({ node, ...props }) => (
+                  <h2 className="text-sm font-bold text-surface-900 dark:text-white mt-2 mb-1" {...props} />
+                ),
+                h3: ({ node, ...props }) => (
+                  <h3 className="text-sm font-bold text-surface-900 dark:text-white mt-2 mb-1" {...props} />
+                ),
+                p: ({ node, ...props }) => (
+                  <p className="mb-2 leading-relaxed text-surface-800 dark:text-gray-100 last:mb-0" {...props} />
+                ),
+                ul: ({ node, ...props }) => (
+                  <ul className="list-disc pl-5 mb-2 space-y-1 text-surface-800 dark:text-gray-100" {...props} />
+                ),
+                ol: ({ node, ...props }) => (
+                  <ol className="list-decimal pl-5 mb-2 space-y-1 text-surface-800 dark:text-gray-100" {...props} />
+                ),
+                li: ({ node, ...props }) => (
+                  <li className="leading-snug" {...props} />
+                ),
+                strong: ({ node, ...props }) => (
+                  <strong className="font-semibold text-surface-950 dark:text-white" {...props} />
+                ),
+                hr: ({ node, ...props }) => (
+                  <hr className="my-2.5 border-surface-200 dark:border-gray-700" {...props} />
+                ),
+                code: ({ node, inline, ...props }) =>
+                  inline ? (
+                    <code className="px-1 py-0.5 rounded bg-surface-200 dark:bg-gray-700 text-accent font-mono text-xs" {...props} />
+                  ) : (
+                    <code className="block p-2 rounded-lg bg-surface-200/70 dark:bg-gray-900 text-surface-900 dark:text-gray-200 font-mono text-xs overflow-x-auto my-1.5" {...props} />
+                  ),
+              }}
+            >
+              {message.text}
+            </ReactMarkdown>
+          </div>
+        )}
         {!isUser && (
           <div className="flex items-center gap-1 mt-2 pt-2 border-t border-surface-200/50 dark:border-gray-700/50">
             <button
