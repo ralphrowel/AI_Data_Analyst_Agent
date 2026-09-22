@@ -31,6 +31,7 @@ from backend.app.memory.session_store import default_session_store
 from backend.app.data_engine.dataset_manager import default_dataset_manager
 from backend.app.auth.supabase_auth import get_current_user, User
 from backend.app.auth.quota_manager import default_quota_manager
+from backend.app.auth.rate_limiter import RateLimit
 
 
 router = APIRouter()
@@ -80,7 +81,11 @@ def list_datasets(current_user: User = Depends(get_current_user)):
     return default_dataset_manager.list_datasets(user_id=current_user.id)
 
 
-@router.post("/api/upload", response_model=UploadResponse)
+@router.post(
+    "/api/upload",
+    response_model=UploadResponse,
+    dependencies=[Depends(RateLimit(limit=5, window_seconds=60, name="file uploads"))],
+)
 def upload_file(req: UploadDatasetRequest, current_user: User = Depends(get_current_user)):
     """Upload a CSV dataset privately scoped to the user or a knowledge document for RAG."""
     if current_user.id == "user_default":
@@ -431,7 +436,10 @@ def get_dataset_changes(current_user: User = Depends(get_current_user)):
 
 # --- Analytics & Question Answering ---
 
-@router.get("/api/suggestions")
+@router.get(
+    "/api/suggestions",
+    dependencies=[Depends(RateLimit(limit=30, window_seconds=60, name="suggestions"))],
+)
 def get_suggestions(
     provider: Optional[str] = None,
     session_id: Optional[str] = None,
@@ -467,7 +475,11 @@ def get_suggestions(
     return fallback
 
 
-@router.post("/api/ask", response_model=AnalysisResponse)
+@router.post(
+    "/api/ask",
+    response_model=AnalysisResponse,
+    dependencies=[Depends(RateLimit(limit=15, window_seconds=60, name="chat questions"))],
+)
 def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)):
     # 1. QUOTA GUARD: Check if user has exceeded their daily token limit
     default_quota_manager.check_quota(current_user.id)
