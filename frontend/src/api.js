@@ -124,10 +124,11 @@ export async function deleteSession(sessionId) {
 }
 
 export async function fetchSuggestions(sessionId, provider) {
-  const url = new URL(`${BASE}/api/suggestions`);
-  if (sessionId) url.searchParams.append("session_id", sessionId);
-  if (provider) url.searchParams.append("provider", provider);
-  const res = await fetch(url.toString(), {
+  const params = new URLSearchParams();
+  if (sessionId) params.append("session_id", sessionId);
+  if (provider) params.append("provider", provider);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`${BASE}/api/suggestions${qs}`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error("Failed to fetch suggestions");
@@ -157,15 +158,17 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
 }
 
 export async function fetchDatasetRows(datasetName, page = 1, pageSize = 50, search = "", sortBy = "", sortOrder = "asc") {
-  const url = new URL(`${BASE}/api/datasets/${encodeURIComponent(datasetName)}/rows`);
-  url.searchParams.append("page", page);
-  url.searchParams.append("page_size", pageSize);
-  if (search) url.searchParams.append("search", search);
+  const safeName = encodeURIComponent(datasetName || "netflix_titles.csv");
+  const params = new URLSearchParams();
+  params.append("page", page);
+  params.append("page_size", pageSize);
+  if (search) params.append("search", search);
   if (sortBy) {
-    url.searchParams.append("sort_by", sortBy);
-    url.searchParams.append("sort_order", sortOrder);
+    params.append("sort_by", sortBy);
+    params.append("sort_order", sortOrder || "asc");
   }
-  const res = await fetch(url.toString(), {
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`${BASE}/api/datasets/${safeName}/rows${qs}`, {
     headers: authHeaders(),
   });
   if (!res.ok) {
