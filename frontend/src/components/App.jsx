@@ -254,6 +254,9 @@ export default function App() {
           setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
           setActiveSessionId((prev) => prev || "demo_guest_netflix");
           setActiveTab("chat");
+          if (!localStorage.getItem("hasSeenTour")) {
+            setTimeout(() => setShowProductTour(true), 600);
+          }
         }
       });
 
@@ -707,6 +710,9 @@ export default function App() {
             );
             setMessages([]);
             setCharts([]);
+            if (!localStorage.getItem("hasSeenTour")) {
+              setTimeout(() => setShowProductTour(true), 600);
+            }
           }
         }}
       />
@@ -714,6 +720,7 @@ export default function App() {
       <ProductTour
         isOpen={showProductTour}
         onClose={() => setShowProductTour(false)}
+        onSelectTab={setActiveTab}
       />
     </div>
   );

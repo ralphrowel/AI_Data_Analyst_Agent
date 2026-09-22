@@ -27,31 +27,52 @@ const TOUR_STEPS = [
   },
 ];
 
-export default function ProductTour({ isOpen, onClose }) {
+export default function ProductTour({ isOpen, onClose, onSelectTab }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [coords, setCoords] = useState(null);
 
-  const step = TOUR_STEPS[currentStep];
+  // Always reset to step 0 when opened
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(0);
+      setCoords(null);
+    }
+  }, [isOpen]);
+
+  const step = TOUR_STEPS[currentStep] || TOUR_STEPS[0];
 
   const updatePosition = useCallback(() => {
     if (!isOpen || !step) return;
-    const el = document.querySelector(step.target);
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      setCoords({
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-        bottom: rect.bottom,
-        right: rect.right,
-      });
-      // Scroll into view if needed
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    } else {
-      setCoords(null);
+
+    // Ensure we are in chat tab for input and chart panel steps
+    if (step.target.includes("chat-input") || step.target.includes("chart-panel")) {
+      if (onSelectTab) onSelectTab("chat");
     }
-  }, [isOpen, step]);
+
+    const measure = () => {
+      const el = document.querySelector(step.target);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) {
+          setCoords({
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            bottom: rect.bottom,
+            right: rect.right,
+          });
+          el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          return;
+        }
+      }
+      setCoords(null);
+    };
+
+    measure();
+    const timer = setTimeout(measure, 100);
+    return () => clearTimeout(timer);
+  }, [isOpen, step, onSelectTab]);
 
   useEffect(() => {
     updatePosition();
@@ -62,19 +83,6 @@ export default function ProductTour({ isOpen, onClose }) {
       window.removeEventListener("scroll", updatePosition, true);
     };
   }, [updatePosition]);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!isOpen) return;
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") handleNext();
-      if (e.key === "ArrowLeft") handlePrev();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, currentStep]);
-
-  if (!isOpen) return null;
 
   const handleNext = () => {
     if (currentStep < TOUR_STEPS.length - 1) {
@@ -95,24 +103,45 @@ export default function ProductTour({ isOpen, onClose }) {
     onClose();
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!isOpen) return;
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, currentStep]);
+
+  if (!isOpen) return null;
+
   // Compute tooltip card position relative to target
   let tooltipStyle = {};
+  const cardWidth = 360;
+  const cardHeight = 220;
+  const padding = 14;
+
   if (coords) {
-    const padding = 12;
     if (step.position === "bottom") {
       tooltipStyle = {
-        top: Math.min(window.innerHeight - 220, coords.bottom + padding),
-        left: Math.max(16, Math.min(window.innerWidth - 340, coords.left)),
+        top: Math.min(window.innerHeight - cardHeight - 20, coords.bottom + padding),
+        left: Math.max(16, Math.min(window.innerWidth - cardWidth - 20, coords.left)),
       };
     } else if (step.position === "top") {
       tooltipStyle = {
-        bottom: window.innerHeight - coords.top + padding,
-        left: Math.max(16, Math.min(window.innerWidth - 340, coords.left)),
+        top: Math.max(20, coords.top - cardHeight - padding),
+        left: Math.max(16, Math.min(window.innerWidth - cardWidth - 20, coords.left)),
       };
     } else if (step.position === "left") {
       tooltipStyle = {
-        top: Math.max(70, Math.min(window.innerHeight - 240, coords.top + 20)),
-        right: window.innerWidth - coords.left + padding,
+        top: Math.max(70, Math.min(window.innerHeight - cardHeight - 20, coords.top)),
+        left: Math.max(16, coords.left - cardWidth - padding),
+      };
+    } else {
+      tooltipStyle = {
+        top: Math.min(window.innerHeight - cardHeight - 20, coords.bottom + padding),
+        left: Math.max(16, Math.min(window.innerWidth - cardWidth - 20, coords.left)),
       };
     }
   } else {
@@ -124,14 +153,17 @@ export default function ProductTour({ isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-auto">
-      {/* Dark overlay with spotlight cutout */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-[1.5px] transition-all duration-300" onClick={handleComplete} />
+    <div className="fixed inset-0 z-[9999] pointer-events-auto">
+      {/* Dark overlay with backdrop blur */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-[2px] transition-all duration-300 z-[9998]"
+        onClick={handleComplete}
+      />
 
       {/* Target highlight ring */}
       {coords && (
         <div
-          className="fixed pointer-events-none rounded-xl border-2 border-accent ring-4 ring-accent/30 transition-all duration-300 z-50 shadow-2xl"
+          className="fixed pointer-events-none rounded-xl border-2 border-accent ring-4 ring-accent/30 transition-all duration-300 z-[9999] shadow-2xl"
           style={{
             top: coords.top - 4,
             left: coords.left - 4,
@@ -143,7 +175,7 @@ export default function ProductTour({ isOpen, onClose }) {
 
       {/* Tooltip Card */}
       <div
-        className="fixed z-50 w-80 sm:w-96 p-5 rounded-2xl bg-white dark:bg-gray-900 border border-surface-200 dark:border-gray-800 shadow-2xl transition-all duration-300 animate-scale-up"
+        className="fixed z-[10000] w-80 sm:w-96 p-5 rounded-2xl bg-white dark:bg-gray-900 border border-surface-200 dark:border-gray-800 shadow-2xl transition-all duration-300 animate-scale-up"
         style={tooltipStyle}
       >
         <div className="flex items-center justify-between mb-2">
@@ -151,8 +183,9 @@ export default function ProductTour({ isOpen, onClose }) {
             Step {currentStep + 1} of {TOUR_STEPS.length}
           </span>
           <button
+            type="button"
             onClick={handleComplete}
-            className="text-xs text-surface-400 dark:text-gray-500 hover:text-surface-700 dark:hover:text-gray-300 transition-colors"
+            className="text-xs text-surface-400 dark:text-gray-500 hover:text-surface-700 dark:hover:text-gray-300 transition-colors cursor-pointer"
           >
             Skip tour
           </button>
@@ -190,7 +223,7 @@ export default function ProductTour({ isOpen, onClose }) {
             <button
               type="button"
               onClick={handleNext}
-              className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-accent hover:bg-accent-hover text-white shadow-xs transition-colors cursor-pointer"
+              className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-accent hover:opacity-90 text-white shadow-xs transition-opacity cursor-pointer"
             >
               {currentStep === TOUR_STEPS.length - 1 ? "Got it!" : "Next →"}
             </button>
