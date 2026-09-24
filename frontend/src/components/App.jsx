@@ -26,6 +26,28 @@ import ProductTour from "./ProductTour";
 
 let messageId = 0;
 
+// Safe localStorage wrapper to prevent crashes in privacy browsers (Brave Shields, strict cookies)
+const safeStorage = {
+  getItem: (key, fallback = null) => {
+    try {
+      const val = localStorage.getItem(key);
+      return val !== null ? val : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  },
+  removeItem: (key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  },
+};
+
 const DEFAULT_TOKEN_USAGE = {
   prompt_tokens: 0,
   response_tokens: 0,
@@ -60,7 +82,7 @@ const DEFAULT_NETFLIX_DATASET = {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem("visiq_current_user");
+      const saved = safeStorage.getItem("visiq_current_user");
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -68,17 +90,17 @@ export default function App() {
   });
   const [userQuota, setUserQuota] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(() => {
-    return !localStorage.getItem("visiq_current_user");
+    return !safeStorage.getItem("visiq_current_user");
   });
   const [authModalBanner, setAuthModalBanner] = useState("");
   const [showProductTour, setShowProductTour] = useState(false);
   const [guestQueriesCount, setGuestQueriesCount] = useState(() => {
-    return Number(localStorage.getItem("visiq_guest_queries") || 0);
+    return Number(safeStorage.getItem("visiq_guest_queries", "0"));
   });
 
   const [sessions, setSessions] = useState(() => {
     try {
-      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
       if (savedUser?.isGuest) {
         return [DEFAULT_GUEST_SESSION];
       }
@@ -87,17 +109,17 @@ export default function App() {
   });
   const [activeSessionId, setActiveSessionId] = useState(() => {
     try {
-      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
       if (savedUser?.isGuest) {
-        return localStorage.getItem("activeSessionId") || "demo_guest_netflix";
+        return safeStorage.getItem("activeSessionId", "demo_guest_netflix");
       }
     } catch {}
-    return localStorage.getItem("activeSessionId") || null;
+    return safeStorage.getItem("activeSessionId", null);
   });
   const [activeTab, setActiveTab] = useState("chat");
   const [availableDatasets, setAvailableDatasets] = useState(() => {
     try {
-      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
       if (savedUser?.isGuest) {
         return [DEFAULT_NETFLIX_DATASET];
       }
@@ -115,18 +137,18 @@ export default function App() {
   const [chartEnabled, setChartEnabled] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("darkMode") !== "false"
-  );
-  const [selectedModel, setSelectedModel] = useState(
-    () => localStorage.getItem("selectedModel") || "groq"
-  );
-  const [activeModel, setActiveModel] = useState(
-    () => localStorage.getItem("selectedModel") || "groq"
-  );
-  const [chartTheme, setChartTheme] = useState(
-    () => localStorage.getItem("darkMode") === "false" ? "light" : "dark"
-  );
+  const [darkMode, setDarkMode] = useState(() => {
+    return safeStorage.getItem("darkMode") !== "false";
+  });
+  const [selectedModel, setSelectedModel] = useState(() => {
+    return safeStorage.getItem("selectedModel", "groq");
+  });
+  const [activeModel, setActiveModel] = useState(() => {
+    return safeStorage.getItem("selectedModel", "groq");
+  });
+  const [chartTheme, setChartTheme] = useState(() => {
+    return safeStorage.getItem("darkMode") === "false" ? "light" : "dark";
+  });
 
   const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
   const activeDatasetName = activeSession?.dataset_name || (currentUser?.isGuest ? "netflix_titles.csv" : null);
@@ -264,44 +286,58 @@ export default function App() {
     loadQuota();
   }, [currentUser, loadDatasets, loadQuota]);
 
-  // Live Supabase Auth Subscription
+  // Live Supabase Auth Subscription (safely guarded against Brave Shields and adblockers)
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setAuthToken(session.access_token);
-          const u = {
-            id: session.user.id,
-            token: session.access_token,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
-            avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
-            role: "Supabase User",
-            isGuest: false,
-          };
-          setCurrentUser(u);
-        }
-      });
+      try {
+        supabase.auth
+          .getSession()
+          .then((res) => {
+            const session = res?.data?.session;
+            if (session?.user) {
+              setAuthToken(session.access_token);
+              const u = {
+                id: session.user.id,
+                token: session.access_token,
+                email: session.user.email,
+                name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+                avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
+                role: "Supabase User",
+                isGuest: false,
+              };
+              setCurrentUser(u);
+            }
+          })
+          .catch((err) => {
+            console.warn("Supabase session check bypassed (e.g. Brave Shields blocked):", err);
+          });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (session) {
-          setAuthToken(session.access_token);
-          const u = {
-            id: session.user.id,
-            token: session.access_token,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
-            avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
-            role: "Supabase User",
-            isGuest: false,
-          };
-          setCurrentUser(u);
-        } else if (event === "SIGNED_OUT") {
-          setCurrentUser(null);
-        }
-      });
+        const authChangeResult = supabase.auth.onAuthStateChange((event, session) => {
+          if (session?.user) {
+            setAuthToken(session.access_token);
+            const u = {
+              id: session.user.id,
+              token: session.access_token,
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+              avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
+              role: "Supabase User",
+              isGuest: false,
+            };
+            setCurrentUser(u);
+          } else if (event === "SIGNED_OUT") {
+            setCurrentUser(null);
+          }
+        });
 
-      return () => subscription?.unsubscribe();
+        return () => {
+          try {
+            authChangeResult?.data?.subscription?.unsubscribe();
+          } catch {}
+        };
+      } catch (err) {
+        console.warn("Supabase auth subscription failed:", err);
+      }
     }
   }, []);
 
