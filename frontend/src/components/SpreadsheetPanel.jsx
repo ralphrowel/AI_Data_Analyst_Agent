@@ -302,15 +302,8 @@ export default function SpreadsheetPanel({
     <div className="flex flex-col flex-1 min-h-0 bg-surface-50 dark:bg-gray-950">
       {/* Top Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 bg-white dark:bg-gray-900 border-b border-surface-200 dark:border-gray-700 shrink-0 select-none">
-        {/* Left: Dataset Badge, Search & Filter */}
+        {/* Left: Search & Filter */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 text-xs font-semibold text-surface-800 dark:text-gray-200 shadow-2xs">
-            <svg className="w-3.5 h-3.5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h19.5" />
-            </svg>
-            <span className="truncate max-w-[180px] font-mono text-[11px]">{currentDataset}</span>
-          </div>
-
           <form onSubmit={handleSearchSubmit} className="relative w-56 md:w-72">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-surface-400 dark:text-gray-500"
