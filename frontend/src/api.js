@@ -2,7 +2,15 @@ import { DEMO_NETFLIX_COLUMNS, DEMO_NETFLIX_ROWS } from "./netflix_demo_data";
 import { executeDemoAnalysis } from "./demo_analyst";
 
 function getApiBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  let envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) {
+    envUrl = envUrl.trim();
+    if (!/^https?:\/\//i.test(envUrl)) {
+      envUrl = `https://${envUrl}`;
+    } else if (envUrl.startsWith("http://") && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+      envUrl = envUrl.replace(/^http:\/\//i, "https://");
+    }
+  }
   if (typeof window !== "undefined") {
     const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     if (!isLocalhost && envUrl && (envUrl.includes("localhost") || envUrl.includes("127.0.0.1"))) {
