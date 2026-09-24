@@ -28,7 +28,10 @@ def isolated_storage(tmp_path, monkeypatch):
     default_dataset_manager._cache.clear()
     default_dataset_manager._desc_cache.clear()
     routes._suggestions_cache.clear()
+    from backend.app.auth.rate_limiter import default_rate_limiter
+    default_rate_limiter.reset()
     yield
+    default_rate_limiter.reset()
     storage.engine().dispose()
     storage.engine.cache_clear()
 

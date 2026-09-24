@@ -568,7 +568,8 @@ def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)
             except Exception as e:
                 print(f"Chart generation error: {e}")
 
-        # Atomically record token consumption against user's daily quota
+        # Atomically record token and query consumption against user's daily quota
+        default_quota_manager.record_query(current_user.id)
 
         return AnalysisResponse(
             summary=summary,
@@ -591,7 +592,8 @@ def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)
         user_id=current_user.id,
     )
 
-    # Atomically record tokens consumed against user's daily quota
+    # Atomically record query count against user's daily quota
+    default_quota_manager.record_query(current_user.id)
     consumed_tokens = res.get("usage", {}).get("total_tokens", 0)
 
     return AnalysisResponse(

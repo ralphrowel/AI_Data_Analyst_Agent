@@ -9,6 +9,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+reset_postgres_password.bat
 
 # ==============================================================================
 # Virtual Environments

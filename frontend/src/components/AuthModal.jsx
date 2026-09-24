@@ -58,7 +58,14 @@ export default function AuthModal({
       });
       if (err) throw err;
     } catch (err) {
-      setError(err.message || "Failed to sign in with Google");
+      const rawMsg = err?.msg || err?.message || (typeof err === "string" ? err : JSON.stringify(err));
+      if (rawMsg.includes("Unsupported provider") || rawMsg.includes("provider is not enabled")) {
+        setError(
+          "Google Sign-In is not enabled yet in your Supabase project. To enable it: 1) Go to Supabase Dashboard → Authentication → Providers → Google. 2) Toggle 'Enable Sign in with Google'. 3) Paste your Google Client ID & Secret from Google Cloud Console. Alternatively, you can use the Quick Switch profiles or Guest mode to test immediately."
+        );
+      } else {
+        setError(rawMsg || "Failed to sign in with Google");
+      }
       setLoading(false);
     }
   };

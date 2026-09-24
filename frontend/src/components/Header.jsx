@@ -111,29 +111,44 @@ export default function Header({
 
         {/* Right: Global Status, Theme, Profile */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Daily Token Quota Meter */}
+          {/* Daily Query Quota Meter */}
           {userQuota && (
             <div
-              className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 select-none shadow-2xs"
-              title={`Daily Quota: ${(userQuota.tokens_used || 0).toLocaleString()} / ${(userQuota.daily_limit || 50000).toLocaleString()} tokens used today. Resets midnight UTC.`}
+              className={`hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg border select-none shadow-2xs ${
+                (userQuota.queries_remaining ?? 10) === 0
+                  ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/60"
+                  : "bg-surface-100 dark:bg-gray-800 border-surface-200 dark:border-gray-700"
+              }`}
+              title={`Company Allowance: ${userQuota.queries_used || 0} / ${userQuota.query_limit || 10} queries used today. ${userQuota.company_notice || "This is for a company, not for public use."}`}
             >
               <div className="flex flex-col gap-0.5">
-                <div className="flex items-center justify-between gap-1.5 text-[10px] font-mono leading-none">
-                  <span className="text-surface-500 dark:text-gray-400">Quota</span>
-                  <span className="font-semibold text-surface-800 dark:text-gray-200">
-                    {((userQuota.tokens_remaining ?? 50000)).toLocaleString()} left
+                <div className="flex items-center justify-between gap-2 text-[10px] font-mono leading-none">
+                  <span className="text-surface-500 dark:text-gray-400">Queries</span>
+                  <span
+                    className={`font-semibold ${
+                      (userQuota.queries_remaining ?? 10) === 0
+                        ? "text-red-600 dark:text-red-400 font-bold"
+                        : "text-surface-800 dark:text-gray-200"
+                    }`}
+                  >
+                    {(userQuota.queries_remaining ?? 10)} / {(userQuota.query_limit || 10)} left
                   </span>
                 </div>
-                <div className="w-14 h-1.5 bg-surface-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="w-16 h-1.5 bg-surface-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      (userQuota.percentage_used || 0) > 80
+                      (userQuota.queries_remaining ?? 10) <= 2
                         ? "bg-red-500"
-                        : (userQuota.percentage_used || 0) > 50
+                        : (userQuota.queries_remaining ?? 10) <= 5
                         ? "bg-amber-500"
                         : "bg-emerald-500"
                     }`}
-                    style={{ width: `${Math.max(4, 100 - (userQuota.percentage_used || 0))}%` }}
+                    style={{
+                      width: `${Math.max(
+                        4,
+                        Math.min(100, ((userQuota.queries_remaining ?? 10) / (userQuota.query_limit || 10)) * 100)
+                      )}%`,
+                    }}
                   />
                 </div>
               </div>

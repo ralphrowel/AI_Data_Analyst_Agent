@@ -74,6 +74,11 @@ class UserQuotaResponse(BaseModel):
     tokens_remaining: int
     percentage_used: float
     reset_time: str = "Midnight UTC"
+    queries_used: int = 0
+    query_limit: int = 10
+    queries_remaining: int = 10
+    query_percentage_used: float = 0.0
+    company_notice: str = "This system is designated for internal company analysis, not for public use."
 
 
 class RecentGraphInfo(BaseModel):

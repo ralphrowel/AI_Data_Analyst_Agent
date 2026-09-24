@@ -34,7 +34,8 @@ const DEFAULT_TOKEN_USAGE = {
   groq_tokens: 0,
 };
 
-const MAX_GUEST_QUERIES = 5;
+const MAX_QUERIES_LIMIT = 10;
+const MAX_GUEST_QUERIES = 10;
 
 const DEFAULT_GUEST_SESSION = {
   session_id: "demo_guest_netflix",
@@ -466,12 +467,19 @@ export default function App() {
     async (question) => {
       if (!question.trim() || isStreaming) return;
 
-      // Guest query limit enforcement
-      if (currentUser?.isGuest && guestQueriesCount >= MAX_GUEST_QUERIES) {
-        setAuthModalBanner(
-          "You've reached your 5 free demo queries! Sign in with Google or Email for 50,000 daily tokens, unlimited chats, and private dataset uploads."
-        );
-        setShowAuthModal(true);
+      // Query limit enforcement (10 queries max for all users)
+      const currentQueriesUsed = userQuota?.queries_used ?? (currentUser?.isGuest ? guestQueriesCount : 0);
+      const currentQueryLimit = userQuota?.query_limit ?? MAX_QUERIES_LIMIT;
+      if (currentQueriesUsed >= currentQueryLimit) {
+        const companyNotice = "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access.";
+        const userMsg = { id: ++messageId, role: "user", text: question };
+        const assistantMsg = {
+          id: ++messageId,
+          role: "assistant",
+          text: companyNotice,
+          operation: "error",
+        };
+        setMessages((prev) => [...prev, userMsg, assistantMsg]);
         return;
       }
 
@@ -542,23 +550,22 @@ export default function App() {
           if (nextCount >= MAX_GUEST_QUERIES) {
             setTimeout(() => {
               setAuthModalBanner(
-                "You've completed your 5 free demo queries! Sign in with Google or Email to continue chatting and unlock 50,000 daily tokens."
+                "You have reached the limit of 10 queries. This platform is configured for internal company use and is not available for public access."
               );
-              setShowAuthModal(true);
-            }, 1500);
+            }, 1000);
           }
         }
       } catch (err) {
-        if (err.status === 429 || (err.message && err.message.toLowerCase().includes("budget"))) {
+        const errorText = err.message || "An error occurred while analyzing the dataset.";
+        if (err.status === 429 || errorText.toLowerCase().includes("budget") || errorText.toLowerCase().includes("company")) {
           setAuthModalBanner(
-            "You've reached your free guest demo limit. Sign in with Google or Email to unlock 50,000 daily tokens and custom uploads."
+            "Query limit reached (10/10). This AI data analyst is built for internal company use and is not intended for public access."
           );
-          setShowAuthModal(true);
         }
         const errorMsg = {
           id: ++messageId,
           role: "assistant",
-          text: err.message || "An error occurred while analyzing the dataset.",
+          text: errorText,
           operation: "error",
         };
         setMessages((prev) => [...prev, errorMsg]);

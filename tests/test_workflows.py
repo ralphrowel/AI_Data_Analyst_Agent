@@ -63,3 +63,16 @@ def test_rag_public_references_and_private_overrides(tmp_path):
     (config.KNOWLEDGE_DIR/'old_upload.md').write_text('Legacy confidential quasar account.')
     assert search_documents('normalization',user_id='bob')
     assert search_documents('quasar',user_id='bob') == []
+
+def test_company_query_limit(client, auth):
+    from backend.app.auth.quota_manager import default_quota_manager
+    default_quota_manager.reset_quota('alice')
+    for _ in range(10):
+        default_quota_manager.record_query('alice')
+    resp = client.post('/api/ask', headers=auth, json={'question': 'Count rows'})
+    assert resp.status_code == 429
+    assert "company" in resp.json()["detail"].lower()
+    quota = default_quota_manager.get_user_quota('alice')
+    assert quota['queries_used'] >= 10
+    assert quota['queries_remaining'] == 0
+

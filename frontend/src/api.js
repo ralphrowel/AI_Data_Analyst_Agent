@@ -215,7 +215,9 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
       } catch {}
 
       if (res.status === 429) {
-        throw new Error(errorDetail || "Daily token allowance reached (50,000 tokens). Resets at midnight UTC.");
+        throw new Error(
+          errorDetail || "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access."
+        );
       }
 
       // If in guest mode and backend is offline / returned error, fall back to instant client-side demo analysis
