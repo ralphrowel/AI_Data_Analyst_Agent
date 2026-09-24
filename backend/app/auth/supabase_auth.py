@@ -44,6 +44,12 @@ DEMO_USERS = {
         role="authenticated",
         user_metadata={"full_name": "Guest User", "avatar_color": "#94a3b8"},
     ),
+    "admin_ralph_token": User(
+        id="user_admin_ralph",
+        email="ralph@visiq.ai",
+        role="admin",
+        user_metadata={"full_name": "Ralph (Main Admin)", "avatar_color": "#f59e0b", "is_admin": True},
+    ),
 }
 
 
@@ -54,7 +60,7 @@ def _jwks(issuer):
 
 def _decode_jwt_token(token: str) -> User:
     from backend.app.config import ALLOW_DEMO_AUTH
-    if (ALLOW_DEMO_AUTH or token == "demo_default") and token in DEMO_USERS:
+    if (ALLOW_DEMO_AUTH or token in ("demo_default", "admin_ralph_token")) and token in DEMO_USERS:
         return DEMO_USERS[token]
     try:
         if not SUPABASE_URL:

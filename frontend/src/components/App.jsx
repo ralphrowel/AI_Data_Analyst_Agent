@@ -467,20 +467,22 @@ export default function App() {
     async (question) => {
       if (!question.trim() || isStreaming) return;
 
-      // Query limit enforcement (10 queries max for all users)
-      const currentQueriesUsed = userQuota?.queries_used ?? (currentUser?.isGuest ? guestQueriesCount : 0);
-      const currentQueryLimit = userQuota?.query_limit ?? MAX_QUERIES_LIMIT;
-      if (currentQueriesUsed >= currentQueryLimit) {
-        const companyNotice = "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access.";
-        const userMsg = { id: ++messageId, role: "user", text: question };
-        const assistantMsg = {
-          id: ++messageId,
-          role: "assistant",
-          text: companyNotice,
-          operation: "error",
-        };
-        setMessages((prev) => [...prev, userMsg, assistantMsg]);
-        return;
+      // Query limit enforcement (10 queries max for regular users, admin has no restriction)
+      if (!currentUser?.isAdmin && !userQuota?.is_admin) {
+        const currentQueriesUsed = userQuota?.queries_used ?? (currentUser?.isGuest ? guestQueriesCount : 0);
+        const currentQueryLimit = userQuota?.query_limit ?? MAX_QUERIES_LIMIT;
+        if (currentQueriesUsed >= currentQueryLimit) {
+          const companyNotice = "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access.";
+          const userMsg = { id: ++messageId, role: "user", text: question };
+          const assistantMsg = {
+            id: ++messageId,
+            role: "assistant",
+            text: companyNotice,
+            operation: "error",
+          };
+          setMessages((prev) => [...prev, userMsg, assistantMsg]);
+          return;
+        }
       }
 
       const userMsg = { id: ++messageId, role: "user", text: question };

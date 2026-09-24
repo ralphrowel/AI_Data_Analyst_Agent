@@ -439,3 +439,16 @@ export async function deleteSessionWidget(sessionId, widgetId) {
   }
   return safeJson(res, "Failed to delete widget");
 }
+
+export async function loginWithPassword(username, password) {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const err = await safeJson(res, "Invalid username or password").catch(() => ({ detail: "Invalid username or password" }));
+    throw new Error(err.detail || "Invalid username or password");
+  }
+  return safeJson(res, "Login failed");
+}

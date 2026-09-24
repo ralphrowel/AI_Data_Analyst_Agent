@@ -50,8 +50,14 @@ class QuotaManager:
         entry.setdefault('query_limit', self.default_query_limit)
         return entry
 
+    def is_admin(self, user_id: str) -> bool:
+        return user_id in ("user_admin_ralph", "ralph123")
+
     def check_quota(self, user_id: str, limit: Optional[int] = None) -> bool:
         """Check if user has remaining queries and tokens. Raises HTTP 429 if budget exceeded."""
+        if self.is_admin(user_id):
+            return True
+
         entry = self._get_entry(user_id)
         queries_used = entry.get("queries_used", 0)
         query_limit = entry.get("query_limit", self.default_query_limit)
@@ -121,6 +127,22 @@ class QuotaManager:
     def get_user_quota(self, user_id: str) -> Dict[str, Any]:
         """Retrieve quota status for a user."""
         entry = self._get_entry(user_id)
+        if self.is_admin(user_id):
+            return {
+                "user_id": user_id,
+                "date": entry.get("date", self._today_utc()),
+                "tokens_used": entry.get("tokens_used", 0),
+                "daily_limit": 999999999,
+                "tokens_remaining": 999999999,
+                "percentage_used": 0.0,
+                "queries_used": entry.get("queries_used", 0),
+                "query_limit": 999999,
+                "queries_remaining": 999999,
+                "query_percentage_used": 0.0,
+                "reset_time": "No Expiration",
+                "is_admin": True,
+                "company_notice": "Main Administrator • Unlimited Queries & Tokens",
+            }
         limit = entry.get("daily_limit", self.default_limit)
         used = entry.get("tokens_used", 0)
         remaining = max(0, limit - used)

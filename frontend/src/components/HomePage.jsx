@@ -124,8 +124,16 @@ export default function HomePage({
             )}
           </button>
 
-          {/* Daily Query Quota Indicator */}
-          {userQuota && (
+          {/* Admin Indicator or Daily Query Quota Indicator */}
+          {(currentUser?.isAdmin || userQuota?.is_admin) ? (
+            <div
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 select-none shadow-xs font-mono text-[10px] font-bold"
+              title="Main Administrator Account: Unlimited queries & token allowances."
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>Admin • Unlimited</span>
+            </div>
+          ) : userQuota && (
             <div
               className={`hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg border select-none shadow-xs ${
                 (userQuota.queries_remaining ?? 10) === 0

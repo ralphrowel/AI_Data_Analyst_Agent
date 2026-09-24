@@ -111,8 +111,16 @@ export default function Header({
 
         {/* Right: Global Status, Theme, Profile */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Daily Query Quota Meter */}
-          {userQuota && (
+          {/* Admin Indicator or Daily Query Quota Meter */}
+          {(currentUser?.isAdmin || userQuota?.is_admin) ? (
+            <div
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 select-none shadow-2xs font-mono text-[10px] font-bold"
+              title="Main Administrator Account: Unlimited queries & token allowances."
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>Admin • Unlimited</span>
+            </div>
+          ) : userQuota && (
             <div
               className={`hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg border select-none shadow-2xs ${
                 (userQuota.queries_remaining ?? 10) === 0

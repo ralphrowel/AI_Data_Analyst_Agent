@@ -79,6 +79,7 @@ class UserQuotaResponse(BaseModel):
     queries_remaining: int = 10
     query_percentage_used: float = 0.0
     company_notice: str = "This system is designated for internal company analysis, not for public use."
+    is_admin: bool = False
 
 
 class RecentGraphInfo(BaseModel):
@@ -142,6 +143,11 @@ class PinWidgetRequest(RequestModel):
     chart_spec: Optional[Dict[str, Any]] = None
     operation: Optional[str] = None
     chart_type: Optional[str] = None
+
+
+class LoginRequest(RequestModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=100)
 
 
 

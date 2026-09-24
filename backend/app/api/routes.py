@@ -17,6 +17,7 @@ from backend.app.api.schemas import (
     PinWidgetRequest,
     RecentGraphInfo,
     UserQuotaResponse,
+    LoginRequest,
 )
 from backend.app.config import USE_LEGACY_AGENT, KNOWLEDGE_DIR
 from backend.app.agent.coordinator import default_coordinator
@@ -68,6 +69,25 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
 def get_user_quota(current_user: User = Depends(get_current_user)):
     """Retrieve daily token quota usage and remaining allowance for the current user."""
     return default_quota_manager.get_user_quota(current_user.id)
+
+
+@router.post("/api/auth/login")
+def login_with_password(request: LoginRequest):
+    """Authenticate administrator or internal team user with username and password."""
+    if request.username == "ralph123" and request.password == "ralph123":
+        return {
+            "token": "admin_ralph_token",
+            "user": {
+                "id": "user_admin_ralph",
+                "email": "ralph@visiq.ai",
+                "name": "Ralph (Admin)",
+                "role": "Super Admin",
+                "avatar": "R",
+                "color": "bg-gradient-to-tr from-amber-500 to-red-600",
+                "is_admin": True,
+            },
+        }
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 
 
