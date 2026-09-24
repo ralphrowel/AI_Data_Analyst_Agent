@@ -132,6 +132,7 @@ chroma/
 faiss_index/
 lancedb/
 .lancedb/
+data/uploads/
 
 # ==============================================================================
 # Portfolio Documentation & Assets

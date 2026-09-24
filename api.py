@@ -1,7 +1,6 @@
-"""Root entrypoint: starts both the FastAPI backend and the Vite frontend dev server."""
-import subprocess
-import sys
-from pathlib import Path
+from backend.app.main import app
+
+__all__ = ["app"]
 
 if __name__ == "__main__":
     import uvicorn

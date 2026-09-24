@@ -409,20 +409,30 @@ export default function App() {
       try {
         let targetDataset = datasetName;
         if (file) {
-          if (currentUser?.isGuest) {
-            setAuthModalBanner("Guest accounts cannot upload private datasets. Please sign in with Google or Email.");
-            setShowAuthModal(true);
-            return;
+          // Check if file matches an existing pre-loaded dataset in availableDatasets
+          const isExisting = (availableDatasets || []).some(
+            (d) => d.name.toLowerCase() === file.name.toLowerCase()
+          );
+
+          if (isExisting) {
+            // Can use existing dataset directly without redundant upload
+            targetDataset = file.name;
+          } else {
+            if (currentUser?.isGuest) {
+              setAuthModalBanner("Guest accounts cannot upload private datasets. Please sign in with Google or Email.");
+              setShowAuthModal(true);
+              return;
+            }
+            const fileContent = await file.text();
+            const uploadRes = await uploadDataset(file.name, fileContent);
+            targetDataset = uploadRes.name || uploadRes.filename || file.name;
+            const updatedDatasets = await fetchDatasets();
+            setAvailableDatasets(updatedDatasets);
           }
-          const fileContent = await file.text();
-          const uploadRes = await uploadDataset(file.name, fileContent);
-          targetDataset = uploadRes.name || uploadRes.filename || file.name;
-          const updatedDatasets = await fetchDatasets();
-          setAvailableDatasets(updatedDatasets);
         }
 
         if (!targetDataset) {
-          alert("Please select a valid CSV file.");
+          alert("Please select a valid CSV file or dataset.");
           return;
         }
 
@@ -431,7 +441,28 @@ export default function App() {
           .replace(/_/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase())} Workspace`;
 
-        const newSession = await createSession(targetDataset, title || fallbackTitle);
+        let newSession;
+        try {
+          newSession = await createSession(targetDataset, title || fallbackTitle);
+        } catch (sessErr) {
+          // If in guest mode, demo mode, or backend returned unreachable, create an instant client-side session
+          if (currentUser?.isGuest || targetDataset.includes("netflix") || targetDataset.includes("salaries")) {
+            console.warn("Backend session creation failed or in offline demo mode. Creating local workspace session:", sessErr);
+            newSession = {
+              session_id: `session_${Date.now()}`,
+              dataset_name: targetDataset,
+              title: title || fallbackTitle,
+              created_at: new Date().toISOString(),
+              message_count: 0,
+              widget_count: 0,
+              token_usage: { ...DEFAULT_TOKEN_USAGE },
+              last_message: "",
+            };
+          } else {
+            throw sessErr;
+          }
+        }
+
         setSessions((prev) => [newSession, ...prev]);
         setActiveSessionId(newSession.session_id);
         setActiveTab("chat");
@@ -443,10 +474,11 @@ export default function App() {
         setShowNewChatModal(false);
       } catch (err) {
         console.error("Failed to create workspace:", err);
-        alert("Failed to create workspace. Please check the file and try again.");
+        const detail = err?.message || "Please check your network and backend server status.";
+        alert(`Failed to create workspace: ${detail}`);
       }
     },
-    [currentUser]
+    [currentUser, availableDatasets]
   );
 
   const handleDeleteSession = useCallback(async (sessionId) => {
@@ -733,6 +765,7 @@ export default function App() {
         isOpen={showNewChatModal}
         onClose={() => setShowNewChatModal(false)}
         onCreate={handleConfirmNewChat}
+        availableDatasets={availableDatasets}
       />
 
       <AuthModal
