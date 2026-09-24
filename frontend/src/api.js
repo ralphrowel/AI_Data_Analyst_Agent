@@ -101,8 +101,14 @@ export async function uploadDataset(filename, content) {
     body: JSON.stringify({ filename, content }),
   });
   if (!res.ok) {
-    const err = await safeJson(res, "Upload failed").catch(() => ({ detail: "Upload failed" }));
-    throw new Error(err.detail || "Failed to upload dataset");
+    let errorDetail = "";
+    try {
+      const data = await res.json();
+      errorDetail = data.detail || data.message || "";
+    } catch {
+      errorDetail = `Server returned HTTP ${res.status}: ${res.statusText || "Upload failed"}`;
+    }
+    throw new Error(errorDetail || `Upload failed with HTTP ${res.status}`);
   }
   return safeJson(res, "Upload failed");
 }

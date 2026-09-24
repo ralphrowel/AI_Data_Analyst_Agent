@@ -154,7 +154,8 @@ def upload_file(req: UploadDatasetRequest, current_user: User = Depends(get_curr
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail="Request could not be processed")
+            logger.exception("CSV upload failed: %s", e)
+            raise HTTPException(status_code=500, detail=f"Upload processing failed: {str(e)}")
 
     elif lower_name.endswith((".md", ".txt")):
         try:

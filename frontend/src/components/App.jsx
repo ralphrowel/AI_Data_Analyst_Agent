@@ -79,6 +79,20 @@ const DEFAULT_NETFLIX_DATASET = {
   is_private: false,
 };
 
+const DEFAULT_TECH_SALARIES_DATASET = {
+  name: "tech_salaries.csv",
+  filename: "tech_salaries.csv",
+  rows: 15,
+  columns: 7,
+  size_bytes: 758,
+  is_private: false,
+};
+
+const DEFAULT_GLOBAL_DATASETS = [
+  DEFAULT_NETFLIX_DATASET,
+  DEFAULT_TECH_SALARIES_DATASET,
+];
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -118,13 +132,7 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState("chat");
   const [availableDatasets, setAvailableDatasets] = useState(() => {
-    try {
-      const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
-      if (savedUser?.isGuest) {
-        return [DEFAULT_NETFLIX_DATASET];
-      }
-    } catch {}
-    return [];
+    return [...DEFAULT_GLOBAL_DATASETS];
   });
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -177,17 +185,17 @@ export default function App() {
     fetchDatasets()
       .then((data) => {
         let list = data || [];
-        if (currentUser?.isGuest && !list.some((d) => d.name === "netflix_titles.csv")) {
-          list = [DEFAULT_NETFLIX_DATASET, ...list];
+        for (const def of DEFAULT_GLOBAL_DATASETS) {
+          if (!list.some((d) => d.name.toLowerCase() === def.name.toLowerCase())) {
+            list.unshift(def);
+          }
         }
         setAvailableDatasets(list);
       })
       .catch(() => {
-        if (currentUser?.isGuest) {
-          setAvailableDatasets([DEFAULT_NETFLIX_DATASET]);
-        }
+        setAvailableDatasets([...DEFAULT_GLOBAL_DATASETS]);
       });
-  }, [currentUser]);
+  }, []);
 
   // When currentUser changes: synchronize auth token, reload datasets, sessions & quota
   useEffect(() => {
