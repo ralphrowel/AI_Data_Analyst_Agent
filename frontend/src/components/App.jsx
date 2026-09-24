@@ -60,40 +60,6 @@ const DEFAULT_TOKEN_USAGE = {
 const MAX_QUERIES_LIMIT = 10;
 const MAX_GUEST_QUERIES = 10;
 
-const DEFAULT_GUEST_SESSION = {
-  session_id: "demo_guest_netflix",
-  dataset_name: "netflix_titles.csv",
-  title: "Netflix Catalog Analysis",
-  created_at: new Date().toISOString(),
-  message_count: 0,
-  widget_count: 0,
-  token_usage: { ...DEFAULT_TOKEN_USAGE },
-  last_message: "",
-};
-
-const DEFAULT_NETFLIX_DATASET = {
-  name: "netflix_titles.csv",
-  filename: "netflix_titles.csv",
-  rows: 8807,
-  columns: 14,
-  size_bytes: 3443996,
-  is_private: false,
-};
-
-const DEFAULT_TECH_SALARIES_DATASET = {
-  name: "tech_salaries.csv",
-  filename: "tech_salaries.csv",
-  rows: 15,
-  columns: 7,
-  size_bytes: 758,
-  is_private: false,
-};
-
-const DEFAULT_GLOBAL_DATASETS = [
-  DEFAULT_NETFLIX_DATASET,
-  DEFAULT_TECH_SALARIES_DATASET,
-];
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -123,18 +89,10 @@ export default function App() {
     return [];
   });
   const [activeSessionId, setActiveSessionId] = useState(() => {
-    try {
-      const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
-      if (savedUser?.isGuest) {
-        return safeStorage.getItem("activeSessionId", "demo_guest_netflix");
-      }
-    } catch {}
     return safeStorage.getItem("activeSessionId", null);
   });
   const [activeTab, setActiveTab] = useState("chat");
-  const [availableDatasets, setAvailableDatasets] = useState(() => {
-    return [...DEFAULT_GLOBAL_DATASETS];
-  });
+  const [availableDatasets, setAvailableDatasets] = useState([]);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [messages, setMessages] = useState([]);
 
@@ -160,7 +118,7 @@ export default function App() {
   });
 
   const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
-  const activeDatasetName = activeSession?.dataset_name || (currentUser?.isGuest ? "netflix_titles.csv" : null);
+  const activeDatasetName = activeSession?.dataset_name || null;
   const guestQueriesRemaining = Math.max(0, MAX_GUEST_QUERIES - guestQueriesCount);
 
   // Dark mode effect
@@ -185,16 +143,10 @@ export default function App() {
   const loadDatasets = useCallback(() => {
     fetchDatasets()
       .then((data) => {
-        let list = data || [];
-        for (const def of DEFAULT_GLOBAL_DATASETS) {
-          if (!list.some((d) => d.name.toLowerCase() === def.name.toLowerCase())) {
-            list.unshift(def);
-          }
-        }
-        setAvailableDatasets(list);
+        setAvailableDatasets(data || []);
       })
       .catch(() => {
-        setAvailableDatasets([...DEFAULT_GLOBAL_DATASETS]);
+        setAvailableDatasets([]);
       });
   }, []);
 
@@ -218,56 +170,11 @@ export default function App() {
     }
     localStorage.setItem("visiq_current_user", JSON.stringify(currentUser));
 
-    // If guest user, immediately activate Netflix session and chat view so the user never sees a blank screen
-    if (currentUser?.isGuest) {
-      setSessions((prev) =>
-        prev.some((s) => s.dataset_name === "netflix_titles.csv")
-          ? prev
-          : [DEFAULT_GUEST_SESSION, ...prev]
-      );
-      setActiveSessionId((prev) => prev || "demo_guest_netflix");
-      setActiveTab("chat");
-      setAvailableDatasets((prev) =>
-        prev.some((d) => d.name === "netflix_titles.csv")
-          ? prev
-          : [DEFAULT_NETFLIX_DATASET, ...prev]
-      );
-    }
-
     loadDatasets();
 
     fetchSessions()
-      .then(async (sessionList) => {
-        let list = sessionList || [];
-        // If guest user, ensure Netflix session exists and is active immediately
-        if (currentUser?.isGuest) {
-          let netflixSession = list.find((s) => s.dataset_name === "netflix_titles.csv");
-          if (!netflixSession) {
-            try {
-              netflixSession = await createSession("netflix_titles.csv", "Netflix Catalog Analysis");
-              list = [netflixSession, ...list];
-            } catch (err) {
-              console.warn("Backend session creation deferred; using local demo session:", err);
-            }
-          }
-          if (netflixSession) {
-            setSessions(list);
-            setActiveSessionId(netflixSession.session_id);
-            localStorage.setItem("activeSessionId", netflixSession.session_id);
-            setActiveTab("chat");
-          } else {
-            setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
-            setActiveSessionId((prev) => prev || "demo_guest_netflix");
-            setActiveTab("chat");
-          }
-
-          // Trigger guided tour for first-time visitors
-          if (!localStorage.getItem("hasSeenTour")) {
-            setTimeout(() => setShowProductTour(true), 700);
-          }
-          return;
-        }
-
+      .then((sessionList) => {
+        const list = sessionList || [];
         setSessions(list);
         if (list.length > 0) {
           const savedId = localStorage.getItem("activeSessionId");
@@ -282,14 +189,9 @@ export default function App() {
       })
       .catch((err) => {
         console.warn("Failed to fetch sessions:", err);
-        if (currentUser?.isGuest) {
-          setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
-          setActiveSessionId((prev) => prev || "demo_guest_netflix");
-          setActiveTab("chat");
-          if (!localStorage.getItem("hasSeenTour")) {
-            setTimeout(() => setShowProductTour(true), 600);
-          }
-        }
+        setSessions([]);
+        setActiveSessionId(null);
+        localStorage.removeItem("activeSessionId");
       });
 
     loadQuota();
@@ -508,9 +410,14 @@ export default function App() {
       await deleteSession(sessionId);
       setSessions((prev) => {
         const remaining = prev.filter((s) => s.session_id !== sessionId);
-        if (activeSessionId === sessionId && remaining.length > 0) {
-          setActiveSessionId(remaining[0].session_id);
-          localStorage.setItem("activeSessionId", remaining[0].session_id);
+        if (activeSessionId === sessionId) {
+          if (remaining.length > 0) {
+            setActiveSessionId(remaining[0].session_id);
+            localStorage.setItem("activeSessionId", remaining[0].session_id);
+          } else {
+            setActiveSessionId(null);
+            localStorage.removeItem("activeSessionId");
+          }
         }
         return remaining;
       });
@@ -767,9 +674,9 @@ export default function App() {
               </div>
             ) : activeTab === "spreadsheet" ? (
               <SpreadsheetPanel
-                datasetName={activeDatasetName || "netflix_titles.csv"}
-                activeDatasetName={activeDatasetName || "netflix_titles.csv"}
-                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName) || availableDatasets[0]}
+                datasetName={activeDatasetName || ""}
+                activeDatasetName={activeDatasetName || ""}
+                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName) || null}
                 onDatasetUpdated={loadDatasets}
               />
             ) : (
@@ -797,22 +704,6 @@ export default function App() {
         canClose={Boolean(currentUser)}
         onUserChanged={(user) => {
           setCurrentUser(user);
-          if (user?.isGuest) {
-            setSessions([DEFAULT_GUEST_SESSION]);
-            setActiveSessionId(DEFAULT_GUEST_SESSION.session_id);
-            localStorage.setItem("activeSessionId", DEFAULT_GUEST_SESSION.session_id);
-            setActiveTab("chat");
-            setAvailableDatasets((prev) =>
-              prev.some((d) => d.name === "netflix_titles.csv")
-                ? prev
-                : [DEFAULT_NETFLIX_DATASET, ...prev]
-            );
-            setMessages([]);
-            setCharts([]);
-            if (!localStorage.getItem("hasSeenTour")) {
-              setTimeout(() => setShowProductTour(true), 600);
-            }
-          }
         }}
       />
 

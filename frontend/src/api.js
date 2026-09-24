@@ -257,28 +257,72 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
   }
 }
 
+function parseCsvLine(text) {
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === "," && !inQuotes) {
+      result.push(cur.trim());
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 const clientDatasetStore = new Map();
 
 export function registerClientDataset(filename, csvText) {
   if (!filename || !csvText) return;
   try {
-    const lines = csvText.trim().split(/\r?\n/).filter(Boolean);
+    const lines = csvText.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
     if (!lines.length) return;
-    const headerLine = lines[0];
-    const columns = headerLine.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    const rawHeaders = parseCsvLine(lines[0]);
+    const cleanHeaders = rawHeaders.map((h, i) => h || `col_${i + 1}`);
+
     const rows = [];
+    const sampleTypes = cleanHeaders.map(() => ({ numericCount: 0, total: 0 }));
+
     for (let i = 1; i < lines.length; i++) {
-      const parts = lines[i].split(",");
-      const row = {};
-      columns.forEach((col, idx) => {
-        row[col] = parts[idx] != null ? parts[idx].trim().replace(/^["']|["']$/g, "") : "";
+      const parts = parseCsvLine(lines[i]);
+      const row = { _row_index: i - 1 };
+      cleanHeaders.forEach((col, idx) => {
+        const rawVal = parts[idx] != null ? parts[idx] : "";
+        row[col] = rawVal;
+        if (rawVal !== "") {
+          sampleTypes[idx].total++;
+          if (!isNaN(Number(rawVal))) {
+            sampleTypes[idx].numericCount++;
+          }
+        }
       });
       rows.push(row);
     }
+
+    const columns = cleanHeaders.map((col, idx) => {
+      const isNum = sampleTypes[idx].total > 0 && sampleTypes[idx].numericCount === sampleTypes[idx].total;
+      return {
+        name: col,
+        type: isNum ? "integer" : "string",
+      };
+    });
+
     clientDatasetStore.set(filename.toLowerCase(), {
       filename,
       columns,
       rows,
+      rawContent: csvText,
     });
   } catch (err) {
     console.warn("Could not parse client dataset for preview:", err);
@@ -325,7 +369,10 @@ function getFallbackNetflixRows(page = 1, pageSize = 50, search = "", sortBy = "
 }
 
 export async function fetchDatasetRows(datasetName, page = 1, pageSize = 50, search = "", sortBy = "", sortOrder = "asc") {
-  const safeName = encodeURIComponent(datasetName || "netflix_titles.csv");
+  if (!datasetName) {
+    return { columns: [], rows: [], total_rows: 0, total_pages: 1, page: 1, page_size: pageSize };
+  }
+  const safeName = encodeURIComponent(datasetName);
   const params = new URLSearchParams();
   params.append("page", page);
   params.append("page_size", pageSize);

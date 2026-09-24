@@ -57,9 +57,13 @@ export default function HomePage({
     };
   }, [sessions, availableDatasets]);
 
-  // Aggregate Metrics
-  const totalRows = availableDatasets.reduce((acc, d) => acc + (d.rows || 0), 0);
-  const totalDatasets = availableDatasets.length;
+  // Datasets linked to active conversations
+  const sessionDatasetNames = new Set((sessions || []).map((s) => (s.dataset_name || "").toLowerCase()));
+  const activeDatasets = (availableDatasets || []).filter((ds) => sessionDatasetNames.has((ds.name || "").toLowerCase()));
+
+  // Aggregate Metrics based on active conversation tables
+  const totalRows = activeDatasets.reduce((acc, d) => acc + (d.rows || 0), 0);
+  const totalDatasets = activeDatasets.length;
   const totalWorkspaces = sessions.length;
   const totalVisualizations = recentGraphs.length;
 
@@ -514,38 +518,54 @@ export default function HomePage({
             </div>
 
             <div className="rounded-xl border border-surface-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-surface-50 dark:bg-gray-800/60 text-surface-500 dark:text-gray-400 font-semibold border-b border-surface-200 dark:border-gray-800 text-[10px] uppercase">
-                  <tr>
-                    <th className="py-2 px-3">Dataset</th>
-                    <th className="py-2 px-3">Rows</th>
-                    <th className="py-2 px-3">Cols</th>
-                    <th className="py-2 px-3">Size</th>
-                    <th className="py-2 px-3 text-right">Modified</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-100 dark:divide-gray-800/80">
-                  {availableDatasets.map((ds) => (
-                    <tr key={ds.name} className="hover:bg-surface-50/70 dark:hover:bg-gray-800/40 transition-colors">
-                      <td className="py-2 px-3 font-mono font-medium text-surface-900 dark:text-gray-100 truncate max-w-[160px]">
-                        {ds.name}
-                      </td>
-                      <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
-                        {ds.rows ? ds.rows.toLocaleString() : "0"}
-                      </td>
-                      <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
-                        {ds.columns || "0"}
-                      </td>
-                      <td className="py-2 px-3 text-surface-500 dark:text-gray-400 font-mono text-[11px]">
-                        {formatBytes(ds.size_bytes)}
-                      </td>
-                      <td className="py-2 px-3 text-right text-surface-400 dark:text-gray-500 text-[11px]">
-                        {formatRelativeTime(ds.modified_at)}
-                      </td>
+              {activeDatasets.length > 0 ? (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-50 dark:bg-gray-800/60 text-surface-500 dark:text-gray-400 font-semibold border-b border-surface-200 dark:border-gray-800 text-[10px] uppercase">
+                    <tr>
+                      <th className="py-2 px-3">Dataset</th>
+                      <th className="py-2 px-3">Rows</th>
+                      <th className="py-2 px-3">Cols</th>
+                      <th className="py-2 px-3">Size</th>
+                      <th className="py-2 px-3 text-right">Modified</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-surface-100 dark:divide-gray-800/80">
+                    {activeDatasets.map((ds) => (
+                      <tr key={ds.name} className="hover:bg-surface-50/70 dark:hover:bg-gray-800/40 transition-colors">
+                        <td className="py-2 px-3 font-mono font-medium text-surface-900 dark:text-gray-100 truncate max-w-[160px]">
+                          {ds.name}
+                        </td>
+                        <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
+                          {ds.rows ? ds.rows.toLocaleString() : "0"}
+                        </td>
+                        <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
+                          {ds.columns || "0"}
+                        </td>
+                        <td className="py-2 px-3 text-surface-500 dark:text-gray-400 font-mono text-[11px]">
+                          {formatBytes(ds.size_bytes)}
+                        </td>
+                        <td className="py-2 px-3 text-right text-surface-400 dark:text-gray-500 text-[11px]">
+                          {formatRelativeTime(ds.modified_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-surface-100 dark:bg-gray-800 flex items-center justify-center text-surface-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h17.25" />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-medium text-surface-700 dark:text-gray-300">
+                    No active tables yet
+                  </p>
+                  <p className="text-[11px] text-surface-400 dark:text-gray-500 mt-1 max-w-sm mx-auto">
+                    Click <strong>New Chat</strong> above to upload a CSV file and launch a dedicated 1-on-1 analysis workspace.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

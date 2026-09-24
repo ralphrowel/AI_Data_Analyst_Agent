@@ -16,7 +16,7 @@ export default function SpreadsheetPanel({
     datasetName ||
     activeDatasetName ||
     datasetInfo?.name ||
-    "netflix_titles.csv";
+    "";
 
   const [rows, setRows] = useState([]);
   const [columns, setColumns] = useState([]);
@@ -76,10 +76,24 @@ export default function SpreadsheetPanel({
         sortBy,
         sortOrder
       );
-      setRows(data.rows || []);
-      setColumns(data.columns || []);
-      setTotalRows(data.total_rows || 0);
-      setTotalPages(data.total_pages || 1);
+      // Normalize columns to always be objects with name and type
+      const rawCols = data.columns || [];
+      const normalizedCols = rawCols.map((col) => {
+        if (typeof col === "string") {
+          return { name: col, type: "string" };
+        }
+        return { name: col?.name || String(col), type: col?.type || "string" };
+      });
+      // Normalize rows to guarantee _row_index exists
+      const rawRows = data.rows || [];
+      const normalizedRows = rawRows.map((row, idx) => ({
+        ...row,
+        _row_index: row._row_index !== undefined ? row._row_index : (page - 1) * pageSize + idx,
+      }));
+      setRows(normalizedRows);
+      setColumns(normalizedCols);
+      setTotalRows(data.total_rows !== undefined ? data.total_rows : normalizedRows.length);
+      setTotalPages(data.total_pages || Math.max(1, Math.ceil((data.total_rows || normalizedRows.length) / pageSize)));
     } catch (err) {
       setErrorMessage(err.message || "Failed to load spreadsheet records");
     } finally {
