@@ -305,15 +305,8 @@ export default function App() {
   }, []);
 
   const handleNewChatClick = useCallback(() => {
-    if (currentUser?.isGuest) {
-      setAuthModalBanner(
-        "Sign in with Google or Email to create multiple custom workspaces and upload private CSV files."
-      );
-      setShowAuthModal(true);
-      return;
-    }
     setShowNewChatModal(true);
-  }, [currentUser]);
+  }, []);
 
   const handleConfirmNewChat = useCallback(
     async ({ file, title }) => {

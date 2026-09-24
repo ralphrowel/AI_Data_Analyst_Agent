@@ -135,7 +135,7 @@ export default function AuthModal({
               </h4>
             </div>
             <p className="text-xs text-surface-600 dark:text-gray-300 leading-relaxed mb-3">
-              Explore the preloaded <strong>Netflix Catalog dataset (8,800+ titles)</strong>, test automated queries, and generate charts immediately. Up to 10 queries allowed.
+              Upload any CSV file, test automated queries, and generate charts immediately. Up to 10 queries allowed for guest exploration.
             </p>
             <button
               type="button"
