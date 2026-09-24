@@ -257,6 +257,39 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
   }
 }
 
+const clientDatasetStore = new Map();
+
+export function registerClientDataset(filename, csvText) {
+  if (!filename || !csvText) return;
+  try {
+    const lines = csvText.trim().split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return;
+    const headerLine = lines[0];
+    const columns = headerLine.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(",");
+      const row = {};
+      columns.forEach((col, idx) => {
+        row[col] = parts[idx] != null ? parts[idx].trim().replace(/^["']|["']$/g, "") : "";
+      });
+      rows.push(row);
+    }
+    clientDatasetStore.set(filename.toLowerCase(), {
+      filename,
+      columns,
+      rows,
+    });
+  } catch (err) {
+    console.warn("Could not parse client dataset for preview:", err);
+  }
+}
+
+export function getClientDataset(filename) {
+  if (!filename) return null;
+  return clientDatasetStore.get(filename.toLowerCase()) || null;
+}
+
 // In-memory demo fallback for netflix titles when backend is offline or disconnected
 function getFallbackNetflixRows(page = 1, pageSize = 50, search = "", sortBy = "", sortOrder = "asc") {
   let list = [...DEMO_NETFLIX_ROWS];
@@ -312,6 +345,40 @@ export async function fetchDatasetRows(datasetName, page = 1, pageSize = 50, sea
     }
     return await safeJson(res, "Failed to load rows");
   } catch (err) {
+    // Check if we have this dataset in our client store (e.g. uploaded on Vercel or offline)
+    const clientData = getClientDataset(datasetName);
+    if (clientData) {
+      let list = [...clientData.rows];
+      if (search && search.trim()) {
+        const q = search.trim().toLowerCase();
+        list = list.filter((row) =>
+          Object.values(row).some((val) => val && String(val).toLowerCase().includes(q))
+        );
+      }
+      if (sortBy) {
+        list.sort((a, b) => {
+          const valA = a[sortBy];
+          const valB = b[sortBy];
+          if (valA === valB) return 0;
+          if (valA == null) return 1;
+          if (valB == null) return -1;
+          const cmp = valA < valB ? -1 : 1;
+          return sortOrder === "desc" ? -cmp : cmp;
+        });
+      }
+      const totalRows = list.length;
+      const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+      const start = (page - 1) * pageSize;
+      const slice = list.slice(start, start + pageSize);
+      return {
+        rows: slice,
+        columns: clientData.columns,
+        total_rows: totalRows,
+        total_pages: totalPages,
+        page: Number(page),
+        page_size: Number(pageSize),
+      };
+    }
     // If exploring the demo netflix dataset and backend is disconnected or returned HTML
     if (safeName.includes("netflix") || !datasetName) {
       console.warn("Backend dataset rows unavailable; using bundled demo dataset:", err.message);

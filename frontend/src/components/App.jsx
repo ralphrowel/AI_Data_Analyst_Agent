@@ -11,6 +11,7 @@ import {
   pinWidgetToSession,
   fetchUserQuota,
   setAuthToken,
+  registerClientDataset,
 } from "../api";
 import { supabase, isSupabaseConfigured } from "../supabase";
 import Sidebar from "./Sidebar";
@@ -413,62 +414,75 @@ export default function App() {
   }, [currentUser]);
 
   const handleConfirmNewChat = useCallback(
-    async ({ file, datasetName, title }) => {
+    async ({ file, title }) => {
       try {
-        let targetDataset = datasetName;
-        if (file) {
-          // Check if file matches an existing pre-loaded dataset in availableDatasets
-          const isExisting = (availableDatasets || []).some(
-            (d) => d.name.toLowerCase() === file.name.toLowerCase()
-          );
-
-          if (isExisting) {
-            // Can use existing dataset directly without redundant upload
-            targetDataset = file.name;
-          } else {
-            if (currentUser?.isGuest) {
-              setAuthModalBanner("Guest accounts cannot upload private datasets. Please sign in with Google or Email.");
-              setShowAuthModal(true);
-              return;
-            }
-            const fileContent = await file.text();
-            const uploadRes = await uploadDataset(file.name, fileContent);
-            targetDataset = uploadRes.name || uploadRes.filename || file.name;
-            const updatedDatasets = await fetchDatasets();
-            setAvailableDatasets(updatedDatasets);
-          }
-        }
-
-        if (!targetDataset) {
-          alert("Please select a valid CSV file or dataset.");
+        if (!file) {
+          alert("Please select or drop a valid CSV file.");
           return;
         }
+
+        const fileContent = await file.text();
+        const lines = fileContent.trim().split(/\r?\n/).filter(Boolean);
+        const headers = lines[0] ? lines[0].split(",").map((h) => h.trim().replace(/^["']|["']$/g, "")) : [];
+        const rowCount = Math.max(0, lines.length - 1);
+
+        // Register client-side dataset immediately for instant preview / Vercel offline support
+        registerClientDataset(file.name, fileContent);
+
+        let targetDataset = file.name;
+        let isUploaded = false;
+
+        try {
+          const uploadRes = await uploadDataset(file.name, fileContent);
+          targetDataset = uploadRes.name || uploadRes.filename || file.name;
+          isUploaded = true;
+          const updatedDatasets = await fetchDatasets().catch(() => null);
+          if (updatedDatasets) {
+            setAvailableDatasets(updatedDatasets);
+          }
+        } catch (uploadErr) {
+          console.warn("Backend upload unreachable or failed; using client dataset mode:", uploadErr);
+        }
+
+        // Add to availableDatasets state
+        const datasetMetadata = {
+          name: targetDataset,
+          filename: targetDataset,
+          rows: rowCount,
+          columns: headers.length,
+          size_bytes: file.size,
+          is_private: true,
+        };
+        setAvailableDatasets((prev) => [
+          datasetMetadata,
+          ...prev.filter((d) => d.name.toLowerCase() !== targetDataset.toLowerCase()),
+        ]);
 
         const fallbackTitle = `${targetDataset
           .replace(/\.[^/.]+$/, "")
           .replace(/_/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase())} Workspace`;
 
-        let newSession;
-        try {
-          newSession = await createSession(targetDataset, title || fallbackTitle);
-        } catch (sessErr) {
-          // If in guest mode, demo mode, or backend returned unreachable, create an instant client-side session
-          if (currentUser?.isGuest || targetDataset.includes("netflix") || targetDataset.includes("salaries")) {
-            console.warn("Backend session creation failed or in offline demo mode. Creating local workspace session:", sessErr);
-            newSession = {
-              session_id: `session_${Date.now()}`,
-              dataset_name: targetDataset,
-              title: title || fallbackTitle,
-              created_at: new Date().toISOString(),
-              message_count: 0,
-              widget_count: 0,
-              token_usage: { ...DEFAULT_TOKEN_USAGE },
-              last_message: "",
-            };
-          } else {
-            throw sessErr;
+        let newSession = null;
+        if (isUploaded) {
+          try {
+            newSession = await createSession(targetDataset, title || fallbackTitle);
+          } catch (sessErr) {
+            console.warn("Backend session creation failed:", sessErr);
           }
+        }
+
+        if (!newSession) {
+          newSession = {
+            session_id: `session_${Date.now()}`,
+            dataset_name: targetDataset,
+            title: title || fallbackTitle,
+            created_at: new Date().toISOString(),
+            message_count: 0,
+            widget_count: 0,
+            token_usage: { ...DEFAULT_TOKEN_USAGE },
+            last_message: "",
+          };
         }
 
         setSessions((prev) => [newSession, ...prev]);
@@ -482,11 +496,11 @@ export default function App() {
         setShowNewChatModal(false);
       } catch (err) {
         console.error("Failed to create workspace:", err);
-        const detail = err?.message || "Please check your network and backend server status.";
+        const detail = err?.message || "Please check your file and try again.";
         alert(`Failed to create workspace: ${detail}`);
       }
     },
-    [currentUser, availableDatasets]
+    [currentUser]
   );
 
   const handleDeleteSession = useCallback(async (sessionId) => {
@@ -773,7 +787,6 @@ export default function App() {
         isOpen={showNewChatModal}
         onClose={() => setShowNewChatModal(false)}
         onCreate={handleConfirmNewChat}
-        availableDatasets={availableDatasets}
       />
 
       <AuthModal
