@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from backend.app.paths import inside
@@ -34,6 +35,8 @@ from backend.app.auth.supabase_auth import get_current_user, User
 from backend.app.auth.quota_manager import default_quota_manager
 from backend.app.auth.rate_limiter import RateLimit
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
