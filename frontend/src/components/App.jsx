@@ -197,6 +197,19 @@ export default function App() {
     loadQuota();
   }, [currentUser, loadDatasets, loadQuota]);
 
+  // Listen for global auth errors (e.g. expired tokens) to prompt sign-in cleanly
+  useEffect(() => {
+    const handleAuthError = () => {
+      setAuthToken(null);
+      setCurrentUser(null);
+      setActiveSessionId(null);
+      setShowAuthModal(true);
+      setAuthModalBanner("Your session has expired. Please sign in with username/password or continue as Guest.");
+    };
+    window.addEventListener("visiq:auth_error", handleAuthError);
+    return () => window.removeEventListener("visiq:auth_error", handleAuthError);
+  }, []);
+
   // Live Supabase Auth Subscription (safely guarded against Brave Shields and adblockers)
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
@@ -204,6 +217,10 @@ export default function App() {
         supabase.auth
           .getSession()
           .then((res) => {
+            const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
+            if (savedUser?.isAdmin || savedUser?.isGuest) {
+              return;
+            }
             const session = res?.data?.session;
             if (session?.user) {
               setAuthToken(session.access_token);
@@ -224,6 +241,10 @@ export default function App() {
           });
 
         const authChangeResult = supabase.auth.onAuthStateChange((event, session) => {
+          const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
+          if (savedUser?.isAdmin || savedUser?.isGuest) {
+            return;
+          }
           if (session?.user) {
             setAuthToken(session.access_token);
             const u = {

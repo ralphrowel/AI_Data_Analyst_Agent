@@ -46,6 +46,15 @@ function authHeaders(extra = {}) {
   return headers;
 }
 
+export function handleAuthFailure(status) {
+  if (status === 401) {
+    setAuthToken(null);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("visiq:auth_error"));
+    }
+  }
+}
+
 /**
  * Safely parse JSON from a fetch Response, preventing
  * SyntaxError: Unexpected token '<', "<!doctype "... is not valid JSON
@@ -80,7 +89,10 @@ export async function fetchUserQuota() {
     const res = await fetch(`${BASE}/api/user/quota`, {
       headers: authHeaders(),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      handleAuthFailure(res.status);
+      return null;
+    }
     return await safeJson(res);
   } catch {
     return null;
@@ -93,6 +105,7 @@ export async function fetchDatasets() {
       headers: authHeaders(),
     });
     if (!res.ok) {
+      handleAuthFailure(res.status);
       const err = await safeJson(res, "Failed to fetch datasets").catch(() => ({ detail: "Failed to fetch datasets" }));
       throw new Error(err.detail || "Failed to fetch datasets");
     }
@@ -109,6 +122,7 @@ export async function uploadDataset(filename, content) {
     body: JSON.stringify({ filename, content }),
   });
   if (!res.ok) {
+    handleAuthFailure(res.status);
     let errorDetail = "";
     try {
       const data = await res.json();
@@ -126,6 +140,7 @@ export async function fetchSessions() {
     headers: authHeaders(),
   });
   if (!res.ok) {
+    handleAuthFailure(res.status);
     const err = await safeJson(res, "Failed to fetch sessions").catch(() => ({ detail: "Failed to fetch sessions" }));
     throw new Error(err.detail || "Failed to fetch sessions");
   }
@@ -227,6 +242,10 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
         const err = await safeJson(res, "Failed to get answer");
         errorDetail = err.detail || err.message || "";
       } catch {}
+
+      if (res.status === 401) {
+        handleAuthFailure(401);
+      }
 
       if (res.status === 429) {
         throw new Error(
