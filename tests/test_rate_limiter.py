@@ -45,9 +45,9 @@ def test_rate_limiter_reset():
     assert allowed is True
 
 
-def test_suggestions_endpoint_rate_limit():
+def test_suggestions_endpoint_rate_limit(auth):
     default_rate_limiter.reset()
-    headers = {"Authorization": "Bearer demo_default"}
+    headers = auth
 
     # Mock LLM suggestions to return immediately without external network calls
     with patch("backend.app.api.routes.call_llm", side_effect=Exception("mocked")):

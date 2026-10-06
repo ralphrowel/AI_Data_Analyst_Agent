@@ -10,6 +10,7 @@ from fastapi import Request, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.concurrency import run_in_threadpool
 
+from backend.app import config
 from backend.app.config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def _jwks(issuer):
     return jwt.PyJWKClient(issuer + '/.well-known/jwks.json', timeout=5)
 
 def _decode_jwt_token(token: str) -> User:
-    if token in DEMO_USERS:
+    if config.ALLOW_DEMO_AUTH and token in DEMO_USERS:
         return DEMO_USERS[token]
     try:
         if not SUPABASE_URL:

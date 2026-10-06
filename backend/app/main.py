@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import ALLOWED_ORIGINS, ALLOWED_ORIGIN_REGEX
 from backend.app.api.routes import router
+from backend.app.api.quality_routes import router as quality_router
 from contextlib import asynccontextmanager
 from backend.app import storage
 from backend.app.http_security import RequestBoundary, JsonFormatter
@@ -41,6 +42,7 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(router)
+app.include_router(quality_router)
 app.add_middleware(RequestBoundary)
 
 @app.exception_handler(RequestValidationError)
