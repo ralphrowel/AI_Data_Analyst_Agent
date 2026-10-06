@@ -599,3 +599,82 @@ export async function loginWithPassword(username, password) {
   }
   return safeJson(res, "Login failed");
 }
+
+export async function fetchDatasetProfile(datasetName) {
+  const res = await fetch(`${BASE}/api/datasets/${encodeURIComponent(datasetName)}/profile`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status);
+    const err = await safeJson(res, "Failed to load profile").catch(() => ({ detail: "Failed to load profile" }));
+    throw new Error(err.detail || "Failed to load profile");
+  }
+  return safeJson(res, "Failed to load profile");
+}
+
+export async function fetchQualityReport(datasetName, refresh = false) {
+  const url = `${BASE}/api/datasets/${encodeURIComponent(datasetName)}/quality${refresh ? "?refresh=true" : ""}`;
+  const res = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status);
+    const err = await safeJson(res, "Failed to load quality report").catch(() => ({ detail: "Failed to load quality report" }));
+    throw new Error(err.detail || "Failed to load quality report");
+  }
+  return safeJson(res, "Failed to load quality report");
+}
+
+export async function previewCleaning(datasetName, plan) {
+  const res = await fetch(`${BASE}/api/datasets/${encodeURIComponent(datasetName)}/clean/preview`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(plan),
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status);
+    const err = await safeJson(res, "Failed to preview cleaning").catch(() => ({ detail: "Failed to preview cleaning" }));
+    throw new Error(err.detail || "Failed to preview cleaning");
+  }
+  return safeJson(res, "Failed to preview cleaning");
+}
+
+export async function applyCleaning(datasetName, plan) {
+  const res = await fetch(`${BASE}/api/datasets/${encodeURIComponent(datasetName)}/clean`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(plan),
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status);
+    const err = await safeJson(res, "Failed to apply cleaning").catch(() => ({ detail: "Failed to apply cleaning" }));
+    throw new Error(err.detail || "Failed to apply cleaning");
+  }
+  return safeJson(res, "Failed to apply cleaning");
+}
+
+export async function fetchDatasetLineage(datasetName) {
+  const res = await fetch(`${BASE}/api/datasets/${encodeURIComponent(datasetName)}/lineage`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status);
+    const err = await safeJson(res, "Failed to load lineage").catch(() => ({ detail: "Failed to load lineage" }));
+    throw new Error(err.detail || "Failed to load lineage");
+  }
+  return safeJson(res, "Failed to load lineage");
+}
+
+export async function switchSessionDataset(sessionId, datasetName) {
+  const res = await fetch(`${BASE}/api/sessions/${encodeURIComponent(sessionId)}/dataset`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ dataset_name: datasetName }),
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status);
+    const err = await safeJson(res, "Failed to switch dataset").catch(() => ({ detail: "Failed to switch dataset" }));
+    throw new Error(err.detail || "Failed to switch dataset");
+  }
+  return safeJson(res, "Failed to switch dataset");
+}

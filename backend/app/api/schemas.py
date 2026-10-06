@@ -49,12 +49,22 @@ class SessionResponse(BaseModel):
     session_id: str
     title: str
     dataset_name: str
+    original_dataset: Optional[str] = None
     user_id: Optional[str] = None
     created_at: str
     message_count: int
     widget_count: int = 0
     token_usage: Dict[str, int]
     last_message: Optional[str] = None
+
+
+class SwitchSessionDatasetRequest(RequestModel):
+    dataset_name: str
+
+    @field_validator("dataset_name")
+    @classmethod
+    def safe_filename(cls, value):
+        return validate_filename(value)
 
 
 class DatasetInfo(BaseModel):

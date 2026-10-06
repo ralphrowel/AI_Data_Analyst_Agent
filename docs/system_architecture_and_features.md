@@ -42,6 +42,7 @@ graph TB
         ChatCanvas[Streaming Analysis & Chat Canvas]
         Visualizer[Plotly.js Interactive Canvas]
         Spreadsheet[Live Spreadsheet Editor - CRUD]
+        QualityPanel[Data Quality & Cleaning Panel]
         DashboardGrid[Executive KPI Widget Grid]
         AuthModal[Authentication & Identity Modal]
         APIClient[Client API SDK - api.js]
@@ -60,7 +61,8 @@ graph TB
         QuotaRoutes["/api/user/quota"]
         DatasetRoutes["/api/datasets & /api/upload"]
         SpreadsheetRoutes["/api/datasets/{name}/rows & update & rows/add"]
-        SessionRoutes["/api/sessions & /api/sessions/{id}"]
+        QualityRoutes["/api/datasets/{name}/profile, /quality, /clean, /lineage"]
+        SessionRoutes["/api/sessions & /api/sessions/{id} & PATCH dataset"]
         WidgetRoutes["/api/sessions/{id}/widgets & /api/recent-graphs"]
         AnalysisRoutes["/api/ask & /api/suggestions"]
     end
@@ -68,13 +70,14 @@ graph TB
     subgraph AgentCore["Autonomous Analytical Agent Core"]
         QueryPlanner["LLM Query Planner (Intent Parsing)"]
         PandasEngine["Deterministic Pandas Execution Sandbox"]
+        QualityEngine["Data Quality Engine (Profiler, Checks, Scorer, Cleaner)"]
         ChartSynthesizer["Plotly Chart Spec Synthesizer (Dark/Light Reactivity)"]
         RAGRetriever["Semantic RAG Engine (TF-IDF & Domain Doc Retrieval)"]
     end
 
     subgraph StorageLayer["Dual Persistence & Storage Layer"]
         SQLStore[("PostgreSQL Connection Pooler (Supabase)<br/>Zero-Config SQLite (visiq.db Fallback)")]
-        CloudStorage[("Supabase Storage Bucket: visiq-uploads<br/>Persistent Cloud CSVs")]
+        CloudStorage[("Supabase Storage Bucket: visiq-uploads<br/>Persistent Cloud CSVs & Lineage Metadata")]
         LocalCache[("Local Filesystem Vault<br/>Path Containment inside() Boundary")]
     end
 
@@ -87,6 +90,7 @@ graph TB
     ChatCanvas --> APIClient
     Visualizer --> APIClient
     Spreadsheet --> APIClient
+    QualityPanel --> APIClient
     DashboardGrid --> APIClient
     AuthModal --> APIClient
 
@@ -98,8 +102,10 @@ graph TB
     QuotaManager --> APICore
 
     AnalysisRoutes --> AgentCore
+    QualityRoutes --> QualityEngine
     AgentCore --> InferenceProviders
     AgentCore --> PandasEngine
+    QualityEngine --> StorageLayer
     PandasEngine --> StorageLayer
 
     DatasetRoutes --> StorageLayer
@@ -119,6 +125,7 @@ graph TB
 | **Data Visualization** | Plotly.js (`react-plotly.js`) | Dynamic 2D/3D visualizations, interactive pan/zoom, theme synchronization, responsive SVG export. |
 | **Backend API** | FastAPI, Python 3.12 / 3.14, Uvicorn | Asynchronous high-throughput ASGI engine, OpenAPI auto-documentation, native Pydantic validation. |
 | **Data Science Engine**| Pandas, NumPy, Python Sandbox | In-memory vectorized tabular computing, group aggregations, dynamic time-series handling. |
+| **Data Quality Engine** | Native Python / Pandas (`app.data_quality`) | Rule-based profiling, 4-dimension health scoring (Completeness, Validity, Uniqueness, Consistency), non-destructive cleaning pipeline, audit lineage, formula injection sanitization. |
 | **LLM Inference** | Groq (`openai/gpt-oss-120b`, LLaMA 3.3), Google Gemini 2.5 Flash | Dual-model orchestration: sub-second Groq execution with automated Gemini rotation on rate-limits. |
 | **Database** | Supabase PostgreSQL (SQLAlchemy 2.0) / SQLite | Relational transactional persistence for sessions, user quotas, chat turns, and pinned widgets. |
 | **Object Storage** | Supabase Storage (`visiq-uploads`) / Local Vault | Cross-restart persistent cloud storage for uploaded CSVs and unstructured knowledge documents. |
@@ -161,7 +168,21 @@ graph TB
 * **Widget Recomputation & Removal:** Pinned widgets can be refreshed on demand against updated dataset records or unpinned when no longer required.
 * **Recent Visualizations Gallery:** The home screen features an interactive carousel/grid of recently generated charts across all user workspaces.
 
-### 4.5. Multi-Tenant Authentication & Access Control (RBAC)
+### 4.5. Data Quality, Profiling & Safe Cleaning Pipeline
+* **Zero-Hallucination Raw CSV Profiling:** Inspects the raw physical CSV directly without synthetic transforms to capture authentic schema statistics: memory footprint, inferential data types, null counts, unique cardinalities, and min/max ranges.
+* **4-Dimension Quality Scoring Model:** Computes an objective composite score (0–100) and letter grade (A–F) across four core data quality dimensions:
+  * **Completeness (30% weight):** Assesses presence of missing values, empty strings, and whitespace-only cells.
+  * **Validity (30% weight):** Checks schema conformance, date parseability, mixed numeric datatypes, and format compliance.
+  * **Uniqueness (20% weight):** Detects identical duplicate row records and primary key/ID column collisions without double-counting.
+  * **Consistency (20% weight):** Evaluates categorical casing discrepancies, allowed value compliance, and statistical outliers (IQR / Z-score with high-cardinality noise suppression).
+* **Non-Destructive Cleaning Engine:** In adherence to strict enterprise data integrity standards, **original datasets are never overwritten or mutated in place**. Applied cleaning plans produce derived datasets following the `{original_stem}__clean_v{N}.csv` naming convention.
+* **Dry-Run Cleaning Preview (`POST /clean/preview`):** Analysts can preview proposed cleaning transformations in memory before applying them, receiving before/after row count diffs, sample mutated rows, and projected quality score improvements.
+* **Atomic Lineage & Audit Tracking:** Every cleaning run records a structured audit log containing exact cell-level diff counts, rows dropped, date conversions, coerced null counts, and execution duration. Lineage parent-child relations are persisted in database records.
+* **Formula Injection Sanitization (`to_safe_csv_text`):** Automatically neutralizes Excel/CSV formula injection attacks by escaping leading control characters (`=`, `+`, `-`, `@`, `\t`, `\r`) with single quotes before writing clean datasets.
+* **Agent Integration (`get_quality_report` tool):** Autonomous AI analyst coordinator is equipped with schema-registered data quality tools, enabling conversational queries like *"What is the data quality score of this dataset and what issues should I fix?"*.
+* **Dedicated Quality & Cleaning UI Tab:** Full-featured React panel offering health gauges, letter grade badges, severity filters (CRITICAL, WARNING, INFO), interactive cleaning plan configurator, dry-run diff preview modal, and 1-click active workspace switching.
+
+### 4.6. Multi-Tenant Authentication & Access Control (RBAC)
 * **Super Administrator Account (`ralph123` / `ralph123`):**
   * Dedicated enterprise bypass mode granting **unlimited queries** and unlimited daily token allowances (`is_admin: true`).
 * **Guest Exploration Mode (`demo_default`):**
@@ -173,7 +194,7 @@ graph TB
 * **Automated 401 Session Recovery:**
   * Any expired or corrupted bearer token is automatically caught by the client API SDK, instantly clearing dead storage tokens and prompting clean re-authentication.
 
-### 4.6. Enterprise Security & Hardening
+### 4.7. Enterprise Security & Hardening
 * **Filesystem Containment (`inside()` Boundary Helper):** Strictly validates that all file access stays constrained inside designated user directories, completely immunizing the system against directory traversal (`../`) attacks.
 * **Bounded Ingress Perimeter:** Enforces a 5MB maximum upload payload limit via streaming chunk inspection in `RequestBoundary` middleware.
 * **Rate Limiting:** Protects `/api/ask` (15 req/min), `/api/upload` (5 req/min), and `/api/suggestions` (30 req/min) using sliding-window token buckets.
@@ -238,6 +259,54 @@ sequenceDiagram
     Modal-->>User: Open dedicated 1-on-1 workspace & mount spreadsheet
 ```
 
+### 5.3. Data Quality Assessment & Safe Cleaning Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Analyst
+    participant Panel as QualityPanel.jsx
+    participant API as FastAPI Ingress (/api/datasets)
+    participant Engine as DataQualityService
+    participant Store as FileStorage Vault
+    participant DB as AppRecords DB
+
+    User->>Panel: Selects "Quality & Cleaning" Tab
+    Panel->>API: GET /api/datasets/{name}/quality (Bearer Token)
+    API->>Engine: assess_dataset(name, user_id)
+    alt Hash Matches Cache & File Unchanged
+        Engine->>DB: Fetch cached assessment record
+    else Fingerprint Changed / Force Refresh
+        Engine->>Store: Read raw CSV with pd.read_csv
+        Engine->>Engine: Run profiling + checks + 4D score computation
+        Engine->>DB: Cache assessment result with SHA-256 fingerprint
+    end
+    Engine-->>API: Return QualityAssessmentResult
+    API-->>Panel: Display health score gauge, grade badge & issue cards
+
+    User->>Panel: Configures cleaning steps & clicks "Preview Cleaning"
+    Panel->>API: POST /api/datasets/{name}/clean/preview (CleaningPlan)
+    API->>Engine: preview_cleaning(name, plan, user_id)
+    Engine->>Store: Read raw CSV into memory
+    Engine->>Engine: Run stateless CleaningEngine (in-memory dry run)
+    Engine->>Engine: Compute re-assessment & score improvement diff
+    Engine-->>API: Return CleaningResult (before/after diff, sample rows)
+    API-->>Panel: Render live diff modal (zero disk mutations)
+
+    User->>Panel: Confirms & clicks "Apply Cleaning & Generate Dataset"
+    Panel->>API: POST /api/datasets/{name}/clean (CleaningPlan)
+    API->>Engine: apply_cleaning(name, plan, user_id)
+    Engine->>Store: Read raw CSV & execute CleaningEngine
+    Engine->>Store: Save derived file as {stem}__clean_v{N}.csv (original intact!)
+    Engine->>DB: Record CleaningJob & update DatasetLineage
+    Engine-->>API: Return CleaningJob & clean_dataset_name
+    API-->>Panel: Show success modal with 1-click dataset switch
+    User->>Panel: Clicks "Switch Active Workspace Dataset"
+    Panel->>API: PATCH /api/sessions/{session_id}/dataset ({target_dataset})
+    API->>DB: Update ChatSession active dataset (keeps original_dataset lineage)
+    API-->>Panel: Session switched; analytics pipelines now operate on clean dataset!
+```
+
 ---
 
 ## 6. REST API Endpoint Reference
@@ -254,10 +323,16 @@ sequenceDiagram
 | `POST` | `/api/datasets/{name}/update`| Bearer | Batch save double-clicked cell modifications back to disk/cloud. |
 | `POST` | `/api/datasets/{name}/rows/add`| Bearer | Append a new row matching the dataset schema. |
 | `DELETE`| `/api/datasets/{name}/rows/{i}`| Bearer | Delete a specific row by its sequential index. |
+| `GET` | `/api/datasets/{name}/profile` | Bearer | Raw CSV schema profile (memory, dtypes, nulls, unique counts, ranges). |
+| `GET` | `/api/datasets/{name}/quality` | Bearer | Multi-dimensional quality report (score 0–100, letter grade, defects list). |
+| `POST` | `/api/datasets/{name}/clean/preview` | Bearer | Stateless in-memory dry run of cleaning plan with score delta. |
+| `POST` | `/api/datasets/{name}/clean` | Bearer | Non-destructive execution: writes derived `{stem}__clean_v{N}.csv`. |
+| `GET` | `/api/datasets/{name}/lineage` | Bearer | Full lineage graph & cleaning audit history for a dataset tree. |
 | `GET` | `/api/sessions` | Bearer | List all active conversation workspace sessions for the user. |
 | `POST` | `/api/sessions` | Bearer | Create a dedicated new workspace session bound to a dataset. |
 | `GET` | `/api/sessions/{id}` | Bearer | Retrieve workspace details, metadata, and full message history. |
 | `DELETE`| `/api/sessions/{id}` | Bearer | Delete a workspace session and cascade delete its pinned widgets. |
+| `PATCH`| `/api/sessions/{id}/dataset` | Bearer | Atomically switch the active dataset of a chat session. |
 | `POST` | `/api/sessions/{id}/widgets/pin` | Bearer | Pin an analytical visual insight to the session KPI dashboard. |
 | `GET` | `/api/recent-graphs` | Bearer | Retrieve recent visual insights across workspaces for the gallery carousel. |
 | `GET` | `/api/suggestions` | Bearer | Retrieve 4 schema-tailored starter questions for an active dataset. |

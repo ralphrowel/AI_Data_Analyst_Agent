@@ -17,12 +17,14 @@ class ChatSession:
         dataset_name: str,
         user_id: str = "user_default",
         created_at: Optional[str] = None,
+        original_dataset: Optional[str] = None,
     ):
         self.session_id = session_id
         self.title = title
         self.dataset_name = dataset_name
         self.user_id = user_id
         self.created_at = created_at or datetime.now(timezone.utc).isoformat()
+        self.original_dataset = original_dataset or dataset_name
         self.history: List[Dict[str, Any]] = []
         self.widgets: List[Dict[str, Any]] = []
         self.token_usage: Dict[str, int] = {
@@ -58,6 +60,7 @@ class ChatSession:
             "session_id": self.session_id,
             "title": self.title,
             "dataset_name": self.dataset_name,
+            "original_dataset": getattr(self, "original_dataset", self.dataset_name),
             "user_id": self.user_id,
             "created_at": self.created_at,
             "message_count": len(self.history),
@@ -72,8 +75,21 @@ from backend.app import storage
 from backend.app.auth.context import request_user_id
 
 def restore_session(row):
-    session = ChatSession(row['session_id'], row['title'], row['dataset_name'], row['user_id'], row['created_at'])
-    session.history, session.widgets, session.token_usage = row['history'], row['widgets'], row['token_usage']
+    original_dataset = row.get("original_dataset") or row.get("dataset_name")
+    session = ChatSession(
+        row["session_id"],
+        row["title"],
+        row["dataset_name"],
+        row["user_id"],
+        row["created_at"],
+        original_dataset=original_dataset,
+    )
+    session.history = row.get("history", [])
+    session.widgets = row.get("widgets", [])
+    session.token_usage = row.get(
+        "token_usage",
+        {"prompt_tokens": 0, "response_tokens": 0, "total_tokens": 0, "gemini_tokens": 0, "groq_tokens": 0},
+    )
     return session
 
 class SessionStore:
@@ -192,6 +208,15 @@ class SessionStore:
             session.widgets = [replacements.get(w['id'], w) for w in session.widgets]
             return True
         return bool(self._mutate(session_id, change))
+
+    def switch_dataset(self, session_id: str, dataset_name: str, user_id: Optional[str] = None) -> Optional[ChatSession]:
+        """Switches a session to a different active dataset (e.g. from original to cleaned)."""
+        def change(session):
+            if not getattr(session, "original_dataset", None):
+                session.original_dataset = session.dataset_name
+            session.dataset_name = dataset_name
+            return session
+        return self._mutate(session_id, change)
 
 default_session_store = SessionStore()
 SessionMemory = SessionStore

@@ -16,6 +16,7 @@ from backend.app.tools.structured_tools import (
     group_data,
     sort_data,
     get_unique_values,
+    get_quality_report,
 )
 from backend.app.tools.chart_tool import generate_chart
 from backend.app.tools.rag_tools import search_documents
@@ -212,6 +213,19 @@ TOOL_SCHEMAS = {
             "required": ["query"],
         },
     },
+    "get_quality_report": {
+        "name": "get_quality_report",
+        "description": (
+            "Evaluate dataset data quality, health scores, missing values, duplicates, "
+            "and consistency defects of the active dataset. Call this when the user asks "
+            "about dataset quality, cleanliness, how clean/trustworthy the data is, or what defects exist."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
 }
 
 
@@ -229,6 +243,7 @@ TOOL_FUNCTIONS = {
     "group_data": group_data,
     "sort_data": sort_data,
     "get_unique_values": get_unique_values,
+    "get_quality_report": get_quality_report,
     "generate_chart": generate_chart,
     "search_documents": search_documents,
 }

@@ -20,6 +20,7 @@ import ChartPanel from "./ChartPanel";
 import Header from "./Header";
 import SpreadsheetPanel from "./SpreadsheetPanel";
 import DashboardPanel from "./DashboardPanel";
+import QualityPanel from "./QualityPanel";
 import NewChatModal from "./NewChatModal";
 import HomePage from "./HomePage";
 import AuthModal from "./AuthModal";
@@ -693,11 +694,21 @@ export default function App() {
                 datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName) || null}
                 onDatasetUpdated={loadDatasets}
               />
-            ) : (
+            ) : activeTab === "dashboard" ? (
               <DashboardPanel
                 activeSessionId={activeSessionId}
                 activeDatasetName={activeDatasetName}
                 theme={chartTheme}
+              />
+            ) : (
+              <QualityPanel
+                datasetName={activeDatasetName || ""}
+                activeSessionId={activeSessionId}
+                onDatasetSwitched={(cleanName) => {
+                  loadDatasets();
+                  if (activeSession) activeSession.dataset_name = cleanName;
+                }}
+                darkMode={darkMode}
               />
             )}
           </>

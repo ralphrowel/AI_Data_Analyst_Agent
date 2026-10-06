@@ -111,7 +111,7 @@ TOOL SELECTION RULES:
 4. For questions asking to find or list records matching specific criteria (e.g. 'movies directed by Spielberg', 'titles from 2020'), use 'filter_rows'.
 5. For questions sorting the raw dataset records (e.g. '5 oldest movies', 'highest paying jobs'), use 'sort_data'.
 6. For questions requiring grouping by one column and aggregating another (e.g. 'average salary by job title'), use 'group_data'.
-7. If the user asks about dataset structure, row count, or available columns, use 'get_dataset_schema'.
+7. If the user asks about dataset structure, row count, or available columns, use 'get_dataset_schema'. If the user asks about dataset quality, health, cleanliness, or data defects, use 'get_quality_report'.
 8. If the user asks about definitions or methodology documentation, use 'search_documents'.
 9. When the user asks for a chart, graph, line graph, or trend over time (e.g. 'create me a line graph with it', 'plot average seasons', 'chart by year'):
    - Use 'group_data' grouping by a time/ordered column (like 'release_year' or 'date_added') or categorical column so that multiple data points can be plotted!

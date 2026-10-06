@@ -19,6 +19,7 @@ from backend.app.api.schemas import (
     RecentGraphInfo,
     UserQuotaResponse,
     LoginRequest,
+    SwitchSessionDatasetRequest,
 )
 from backend.app.config import USE_LEGACY_AGENT, KNOWLEDGE_DIR
 from backend.app.agent.coordinator import default_coordinator
@@ -301,6 +302,33 @@ def delete_session(session_id: str, current_user: User = Depends(get_current_use
     if not success:
         raise HTTPException(status_code=404, detail="Session not found or inaccessible")
     return {"deleted": True, "session_id": session_id}
+
+
+@router.patch("/api/sessions/{session_id}/dataset", response_model=SessionResponse)
+def switch_session_dataset(
+    session_id: str,
+    request: SwitchSessionDatasetRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Switch an active chat session to a different dataset (e.g. original ↔ clean)."""
+    session = default_session_store.get_session(session_id, user_id=current_user.id)
+    if not session or (session.user_id != current_user.id and current_user.id != "user_default"):
+        raise HTTPException(status_code=404, detail="Session not found or inaccessible")
+
+    # Validate that the requested dataset exists and is accessible
+    try:
+        default_dataset_manager._resolve_path(request.dataset_name, current_user.id)
+    except (ValueError, FileNotFoundError):
+        raise HTTPException(status_code=404, detail=f"Dataset '{request.dataset_name}' not found")
+
+    updated = default_session_store.switch_dataset(
+        session_id=session_id,
+        dataset_name=request.dataset_name,
+        user_id=current_user.id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Failed to switch dataset on session")
+    return updated.to_dict()
 
 
 # --- Dashboard Widgets Endpoints ---

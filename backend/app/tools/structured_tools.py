@@ -176,3 +176,41 @@ def get_unique_values(
     counts = df[actual_col].value_counts().head(limit)
     return {str(k): int(v) for k, v in counts.items()}
 
+
+def get_quality_report(df: pd.DataFrame) -> dict:
+    """Evaluate comprehensive data quality issues, health metrics, and score on the active dataset."""
+    from backend.app.data_quality.checks import DataQualityEngine
+    from backend.app.data_quality.scorer import DataQualityScorer
+
+    engine = DataQualityEngine()
+    scorer = DataQualityScorer(quality_engine=engine)
+
+    report = engine.analyze(df)
+    score_result = scorer.score(df, existing_report=report)
+
+    return {
+        "total_rows": report.total_rows,
+        "total_columns": report.total_columns,
+        "overall_score": score_result.overall_score,
+        "grade": score_result.grade,
+        "grade_label": score_result.grade_label,
+        "is_trustworthy": score_result.is_trustworthy,
+        "completeness_score": score_result.dimensions["completeness"].score,
+        "validity_score": score_result.dimensions["validity"].score,
+        "uniqueness_score": score_result.dimensions["uniqueness"].score,
+        "consistency_score": score_result.dimensions["consistency"].score,
+        "total_issues_count": report.total_issues_count,
+        "issues_by_category": report.issues_by_category,
+        "top_issues": [
+            {
+                "category": i.category.value,
+                "severity": i.severity.value,
+                "column": i.column,
+                "description": i.description,
+                "affected_count": i.affected_count,
+                "suggested_action": i.suggested_action,
+            }
+            for i in report.issues[:8]
+        ],
+    }
+
