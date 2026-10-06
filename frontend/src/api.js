@@ -2,7 +2,15 @@ import { DEMO_NETFLIX_COLUMNS, DEMO_NETFLIX_ROWS } from "./netflix_demo_data";
 import { executeDemoAnalysis } from "./demo_analyst";
 
 function getApiBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  let envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) {
+    envUrl = envUrl.trim();
+    if (!/^https?:\/\//i.test(envUrl)) {
+      envUrl = `https://${envUrl}`;
+    } else if (envUrl.startsWith("http://") && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+      envUrl = envUrl.replace(/^http:\/\//i, "https://");
+    }
+  }
   if (typeof window !== "undefined") {
     const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     if (!isLocalhost && envUrl && (envUrl.includes("localhost") || envUrl.includes("127.0.0.1"))) {
@@ -36,6 +44,15 @@ function authHeaders(extra = {}) {
     headers["Authorization"] = `Bearer ${currentAuthToken}`;
   }
   return headers;
+}
+
+export function handleAuthFailure(status) {
+  if (status === 401) {
+    setAuthToken(null);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("visiq:auth_error"));
+    }
+  }
 }
 
 /**
@@ -72,7 +89,10 @@ export async function fetchUserQuota() {
     const res = await fetch(`${BASE}/api/user/quota`, {
       headers: authHeaders(),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      handleAuthFailure(res.status);
+      return null;
+    }
     return await safeJson(res);
   } catch {
     return null;
@@ -85,6 +105,7 @@ export async function fetchDatasets() {
       headers: authHeaders(),
     });
     if (!res.ok) {
+      handleAuthFailure(res.status);
       const err = await safeJson(res, "Failed to fetch datasets").catch(() => ({ detail: "Failed to fetch datasets" }));
       throw new Error(err.detail || "Failed to fetch datasets");
     }
@@ -101,8 +122,15 @@ export async function uploadDataset(filename, content) {
     body: JSON.stringify({ filename, content }),
   });
   if (!res.ok) {
-    const err = await safeJson(res, "Upload failed").catch(() => ({ detail: "Upload failed" }));
-    throw new Error(err.detail || "Failed to upload dataset");
+    handleAuthFailure(res.status);
+    let errorDetail = "";
+    try {
+      const data = await res.json();
+      errorDetail = data.detail || data.message || "";
+    } catch {
+      errorDetail = `Server returned HTTP ${res.status}: ${res.statusText || "Upload failed"}`;
+    }
+    throw new Error(errorDetail || `Upload failed with HTTP ${res.status}`);
   }
   return safeJson(res, "Upload failed");
 }
@@ -112,6 +140,7 @@ export async function fetchSessions() {
     headers: authHeaders(),
   });
   if (!res.ok) {
+    handleAuthFailure(res.status);
     const err = await safeJson(res, "Failed to fetch sessions").catch(() => ({ detail: "Failed to fetch sessions" }));
     throw new Error(err.detail || "Failed to fetch sessions");
   }
@@ -214,8 +243,14 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
         errorDetail = err.detail || err.message || "";
       } catch {}
 
+      if (res.status === 401) {
+        handleAuthFailure(401);
+      }
+
       if (res.status === 429) {
-        throw new Error(errorDetail || "Daily token allowance reached (50,000 tokens). Resets at midnight UTC.");
+        throw new Error(
+          errorDetail || "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access."
+        );
       }
 
       // If in guest mode and backend is offline / returned error, fall back to instant client-side demo analysis
@@ -247,6 +282,83 @@ export async function askQuestion(question, chartType, chartTheme, provider, ses
     }
     throw err;
   }
+}
+
+function parseCsvLine(text) {
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === "," && !inQuotes) {
+      result.push(cur.trim());
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+const clientDatasetStore = new Map();
+
+export function registerClientDataset(filename, csvText) {
+  if (!filename || !csvText) return;
+  try {
+    const lines = csvText.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (!lines.length) return;
+    const rawHeaders = parseCsvLine(lines[0]);
+    const cleanHeaders = rawHeaders.map((h, i) => h || `col_${i + 1}`);
+
+    const rows = [];
+    const sampleTypes = cleanHeaders.map(() => ({ numericCount: 0, total: 0 }));
+
+    for (let i = 1; i < lines.length; i++) {
+      const parts = parseCsvLine(lines[i]);
+      const row = { _row_index: i - 1 };
+      cleanHeaders.forEach((col, idx) => {
+        const rawVal = parts[idx] != null ? parts[idx] : "";
+        row[col] = rawVal;
+        if (rawVal !== "") {
+          sampleTypes[idx].total++;
+          if (!isNaN(Number(rawVal))) {
+            sampleTypes[idx].numericCount++;
+          }
+        }
+      });
+      rows.push(row);
+    }
+
+    const columns = cleanHeaders.map((col, idx) => {
+      const isNum = sampleTypes[idx].total > 0 && sampleTypes[idx].numericCount === sampleTypes[idx].total;
+      return {
+        name: col,
+        type: isNum ? "integer" : "string",
+      };
+    });
+
+    clientDatasetStore.set(filename.toLowerCase(), {
+      filename,
+      columns,
+      rows,
+      rawContent: csvText,
+    });
+  } catch (err) {
+    console.warn("Could not parse client dataset for preview:", err);
+  }
+}
+
+export function getClientDataset(filename) {
+  if (!filename) return null;
+  return clientDatasetStore.get(filename.toLowerCase()) || null;
 }
 
 // In-memory demo fallback for netflix titles when backend is offline or disconnected
@@ -284,7 +396,10 @@ function getFallbackNetflixRows(page = 1, pageSize = 50, search = "", sortBy = "
 }
 
 export async function fetchDatasetRows(datasetName, page = 1, pageSize = 50, search = "", sortBy = "", sortOrder = "asc") {
-  const safeName = encodeURIComponent(datasetName || "netflix_titles.csv");
+  if (!datasetName) {
+    return { columns: [], rows: [], total_rows: 0, total_pages: 1, page: 1, page_size: pageSize };
+  }
+  const safeName = encodeURIComponent(datasetName);
   const params = new URLSearchParams();
   params.append("page", page);
   params.append("page_size", pageSize);
@@ -304,6 +419,40 @@ export async function fetchDatasetRows(datasetName, page = 1, pageSize = 50, sea
     }
     return await safeJson(res, "Failed to load rows");
   } catch (err) {
+    // Check if we have this dataset in our client store (e.g. uploaded on Vercel or offline)
+    const clientData = getClientDataset(datasetName);
+    if (clientData) {
+      let list = [...clientData.rows];
+      if (search && search.trim()) {
+        const q = search.trim().toLowerCase();
+        list = list.filter((row) =>
+          Object.values(row).some((val) => val && String(val).toLowerCase().includes(q))
+        );
+      }
+      if (sortBy) {
+        list.sort((a, b) => {
+          const valA = a[sortBy];
+          const valB = b[sortBy];
+          if (valA === valB) return 0;
+          if (valA == null) return 1;
+          if (valB == null) return -1;
+          const cmp = valA < valB ? -1 : 1;
+          return sortOrder === "desc" ? -cmp : cmp;
+        });
+      }
+      const totalRows = list.length;
+      const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+      const start = (page - 1) * pageSize;
+      const slice = list.slice(start, start + pageSize);
+      return {
+        rows: slice,
+        columns: clientData.columns,
+        total_rows: totalRows,
+        total_pages: totalPages,
+        page: Number(page),
+        page_size: Number(pageSize),
+      };
+    }
     // If exploring the demo netflix dataset and backend is disconnected or returned HTML
     if (safeName.includes("netflix") || !datasetName) {
       console.warn("Backend dataset rows unavailable; using bundled demo dataset:", err.message);
@@ -436,4 +585,17 @@ export async function deleteSessionWidget(sessionId, widgetId) {
     throw new Error(err.detail || "Failed to delete widget");
   }
   return safeJson(res, "Failed to delete widget");
+}
+
+export async function loginWithPassword(username, password) {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const err = await safeJson(res, "Invalid username or password").catch(() => ({ detail: "Invalid username or password" }));
+    throw new Error(err.detail || "Invalid username or password");
+  }
+  return safeJson(res, "Login failed");
 }

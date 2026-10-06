@@ -17,13 +17,11 @@ export default function NewChatModal({
     if (!file) return;
     if (file.name.toLowerCase().endsWith(".csv")) {
       setLocalFile(file);
-      if (!customTitle) {
-        const cleanName = file.name
-          .replace(/\.[^/.]+$/, "")
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase());
-        setCustomTitle(`${cleanName} Workspace`);
-      }
+      const cleanName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      setCustomTitle(`${cleanName} Workspace`);
     } else {
       alert("Please select a valid CSV (.csv) file.");
     }
@@ -56,13 +54,14 @@ export default function NewChatModal({
   const handleResetFile = (e) => {
     e.stopPropagation();
     setLocalFile(null);
+    setCustomTitle("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!localFile) {
-      alert("Please select a .csv file from your computer.");
+      alert("Please select or drop a .csv file from your computer.");
       return;
     }
     try {
@@ -100,7 +99,7 @@ export default function NewChatModal({
                 New Chat Workspace
               </h3>
               <p className="text-[11px] text-surface-500 dark:text-gray-400 leading-tight">
-                Upload a CSV file to create an isolated conversational void.
+                Upload a CSV to start a dedicated 1-on-1 analysis conversation.
               </p>
             </div>
           </div>
@@ -119,7 +118,7 @@ export default function NewChatModal({
           {/* File Picker & Drag-and-Drop Area */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-surface-700 dark:text-gray-200">
-              Select Dataset File:
+              Select Dataset File (.csv):
             </label>
             <input
               ref={fileInputRef}
@@ -153,7 +152,7 @@ export default function NewChatModal({
                       {localFile.name}
                     </p>
                     <p className="text-[10px] text-surface-500 dark:text-gray-400 mt-0.5">
-                      {formatSize(localFile.size)} • Ready to upload & analyze
+                      {formatSize(localFile.size)} • Ready for analysis
                     </p>
                   </div>
                   <button
@@ -176,7 +175,7 @@ export default function NewChatModal({
                       Click to browse or drag & drop CSV file here
                     </p>
                     <p className="text-[10px] text-surface-400 dark:text-gray-500 mt-0.5">
-                      Accepts standard tabular .csv files
+                      Accepts standard tabular .csv files (e.g. Netflix, Tech Salaries)
                     </p>
                   </div>
                 </div>
@@ -217,7 +216,7 @@ export default function NewChatModal({
                   : "bg-accent hover:opacity-90 cursor-pointer"
               }`}
             >
-              {isSubmitting ? "Creating..." : "Create Workspace"}
+              {isSubmitting ? "Creating..." : "Start Conversation"}
             </button>
           </div>
         </form>

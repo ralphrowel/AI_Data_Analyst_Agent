@@ -57,9 +57,13 @@ export default function HomePage({
     };
   }, [sessions, availableDatasets]);
 
-  // Aggregate Metrics
-  const totalRows = availableDatasets.reduce((acc, d) => acc + (d.rows || 0), 0);
-  const totalDatasets = availableDatasets.length;
+  // Datasets linked to active conversations
+  const sessionDatasetNames = new Set((sessions || []).map((s) => (s.dataset_name || "").toLowerCase()));
+  const activeDatasets = (availableDatasets || []).filter((ds) => sessionDatasetNames.has((ds.name || "").toLowerCase()));
+
+  // Aggregate Metrics based on active conversation tables
+  const totalRows = activeDatasets.reduce((acc, d) => acc + (d.rows || 0), 0);
+  const totalDatasets = activeDatasets.length;
   const totalWorkspaces = sessions.length;
   const totalVisualizations = recentGraphs.length;
 
@@ -124,29 +128,52 @@ export default function HomePage({
             )}
           </button>
 
-          {/* Daily Quota Indicator */}
-          {userQuota && (
+          {/* Admin Indicator or Daily Query Quota Indicator */}
+          {(currentUser?.isAdmin || userQuota?.is_admin) ? (
             <div
-              className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200 dark:border-gray-700 select-none shadow-xs"
-              title={`Daily Quota: ${(userQuota.tokens_used || 0).toLocaleString()} / ${(userQuota.daily_limit || 50000).toLocaleString()} used today`}
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 select-none shadow-xs font-mono text-[10px] font-bold"
+              title="Main Administrator Account: Unlimited queries & token allowances."
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>Admin • Unlimited</span>
+            </div>
+          ) : userQuota && (
+            <div
+              className={`hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg border select-none shadow-xs ${
+                (userQuota.queries_remaining ?? 10) === 0
+                  ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/60"
+                  : "bg-surface-100 dark:bg-gray-800 border-surface-200 dark:border-gray-700"
+              }`}
+              title={`Company Allowance: ${userQuota.queries_used || 0} / ${userQuota.query_limit || 10} queries used today. ${userQuota.company_notice || "This is for a company, not for public use."}`}
             >
               <div className="flex flex-col gap-0.5">
-                <div className="flex items-center justify-between gap-1.5 text-[10px] font-mono leading-none">
-                  <span className="text-surface-500 dark:text-gray-400">Tokens</span>
-                  <span className="font-semibold text-surface-800 dark:text-gray-200">
-                    {((userQuota.tokens_remaining ?? 50000)).toLocaleString()} left
+                <div className="flex items-center justify-between gap-2 text-[10px] font-mono leading-none">
+                  <span className="text-surface-500 dark:text-gray-400">Queries</span>
+                  <span
+                    className={`font-semibold ${
+                      (userQuota.queries_remaining ?? 10) === 0
+                        ? "text-red-600 dark:text-red-400 font-bold"
+                        : "text-surface-800 dark:text-gray-200"
+                    }`}
+                  >
+                    {(userQuota.queries_remaining ?? 10)} / {(userQuota.query_limit || 10)} left
                   </span>
                 </div>
                 <div className="w-16 h-1.5 bg-surface-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      (userQuota.percentage_used || 0) > 80
+                      (userQuota.queries_remaining ?? 10) <= 2
                         ? "bg-red-500"
-                        : (userQuota.percentage_used || 0) > 50
+                        : (userQuota.queries_remaining ?? 10) <= 5
                         ? "bg-amber-500"
                         : "bg-emerald-500"
                     }`}
-                    style={{ width: `${Math.max(4, 100 - (userQuota.percentage_used || 0))}%` }}
+                    style={{
+                      width: `${Math.max(
+                        4,
+                        Math.min(100, ((userQuota.queries_remaining ?? 10) / (userQuota.query_limit || 10)) * 100)
+                      )}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -491,38 +518,54 @@ export default function HomePage({
             </div>
 
             <div className="rounded-xl border border-surface-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-surface-50 dark:bg-gray-800/60 text-surface-500 dark:text-gray-400 font-semibold border-b border-surface-200 dark:border-gray-800 text-[10px] uppercase">
-                  <tr>
-                    <th className="py-2 px-3">Dataset</th>
-                    <th className="py-2 px-3">Rows</th>
-                    <th className="py-2 px-3">Cols</th>
-                    <th className="py-2 px-3">Size</th>
-                    <th className="py-2 px-3 text-right">Modified</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-100 dark:divide-gray-800/80">
-                  {availableDatasets.map((ds) => (
-                    <tr key={ds.name} className="hover:bg-surface-50/70 dark:hover:bg-gray-800/40 transition-colors">
-                      <td className="py-2 px-3 font-mono font-medium text-surface-900 dark:text-gray-100 truncate max-w-[160px]">
-                        {ds.name}
-                      </td>
-                      <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
-                        {ds.rows ? ds.rows.toLocaleString() : "0"}
-                      </td>
-                      <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
-                        {ds.columns || "0"}
-                      </td>
-                      <td className="py-2 px-3 text-surface-500 dark:text-gray-400 font-mono text-[11px]">
-                        {formatBytes(ds.size_bytes)}
-                      </td>
-                      <td className="py-2 px-3 text-right text-surface-400 dark:text-gray-500 text-[11px]">
-                        {formatRelativeTime(ds.modified_at)}
-                      </td>
+              {activeDatasets.length > 0 ? (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-50 dark:bg-gray-800/60 text-surface-500 dark:text-gray-400 font-semibold border-b border-surface-200 dark:border-gray-800 text-[10px] uppercase">
+                    <tr>
+                      <th className="py-2 px-3">Dataset</th>
+                      <th className="py-2 px-3">Rows</th>
+                      <th className="py-2 px-3">Cols</th>
+                      <th className="py-2 px-3">Size</th>
+                      <th className="py-2 px-3 text-right">Modified</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-surface-100 dark:divide-gray-800/80">
+                    {activeDatasets.map((ds) => (
+                      <tr key={ds.name} className="hover:bg-surface-50/70 dark:hover:bg-gray-800/40 transition-colors">
+                        <td className="py-2 px-3 font-mono font-medium text-surface-900 dark:text-gray-100 truncate max-w-[160px]">
+                          {ds.name}
+                        </td>
+                        <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
+                          {ds.rows ? ds.rows.toLocaleString() : "0"}
+                        </td>
+                        <td className="py-2 px-3 text-surface-600 dark:text-gray-300 font-mono">
+                          {ds.columns || "0"}
+                        </td>
+                        <td className="py-2 px-3 text-surface-500 dark:text-gray-400 font-mono text-[11px]">
+                          {formatBytes(ds.size_bytes)}
+                        </td>
+                        <td className="py-2 px-3 text-right text-surface-400 dark:text-gray-500 text-[11px]">
+                          {formatRelativeTime(ds.modified_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-surface-100 dark:bg-gray-800 flex items-center justify-center text-surface-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h17.25" />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-medium text-surface-700 dark:text-gray-300">
+                    No active tables yet
+                  </p>
+                  <p className="text-[11px] text-surface-400 dark:text-gray-500 mt-1 max-w-sm mx-auto">
+                    Click <strong>New Chat</strong> above to upload a CSV file and launch a dedicated 1-on-1 analysis workspace.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

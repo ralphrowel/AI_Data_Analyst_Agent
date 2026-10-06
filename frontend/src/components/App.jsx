@@ -11,6 +11,7 @@ import {
   pinWidgetToSession,
   fetchUserQuota,
   setAuthToken,
+  registerClientDataset,
 } from "../api";
 import { supabase, isSupabaseConfigured } from "../supabase";
 import Sidebar from "./Sidebar";
@@ -26,6 +27,28 @@ import ProductTour from "./ProductTour";
 
 let messageId = 0;
 
+// Safe localStorage wrapper to prevent crashes in privacy browsers (Brave Shields, strict cookies)
+const safeStorage = {
+  getItem: (key, fallback = null) => {
+    try {
+      const val = localStorage.getItem(key);
+      return val !== null ? val : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  },
+  removeItem: (key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  },
+};
+
 const DEFAULT_TOKEN_USAGE = {
   prompt_tokens: 0,
   response_tokens: 0,
@@ -34,32 +57,13 @@ const DEFAULT_TOKEN_USAGE = {
   groq_tokens: 0,
 };
 
-const MAX_GUEST_QUERIES = 5;
-
-const DEFAULT_GUEST_SESSION = {
-  session_id: "demo_guest_netflix",
-  dataset_name: "netflix_titles.csv",
-  title: "Netflix Catalog Analysis",
-  created_at: new Date().toISOString(),
-  message_count: 0,
-  widget_count: 0,
-  token_usage: { ...DEFAULT_TOKEN_USAGE },
-  last_message: "",
-};
-
-const DEFAULT_NETFLIX_DATASET = {
-  name: "netflix_titles.csv",
-  filename: "netflix_titles.csv",
-  rows: 8807,
-  columns: 14,
-  size_bytes: 3443996,
-  is_private: false,
-};
+const MAX_QUERIES_LIMIT = 10;
+const MAX_GUEST_QUERIES = 10;
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem("visiq_current_user");
+      const saved = safeStorage.getItem("visiq_current_user");
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -67,17 +71,17 @@ export default function App() {
   });
   const [userQuota, setUserQuota] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(() => {
-    return !localStorage.getItem("visiq_current_user");
+    return !safeStorage.getItem("visiq_current_user");
   });
   const [authModalBanner, setAuthModalBanner] = useState("");
   const [showProductTour, setShowProductTour] = useState(false);
   const [guestQueriesCount, setGuestQueriesCount] = useState(() => {
-    return Number(localStorage.getItem("visiq_guest_queries") || 0);
+    return Number(safeStorage.getItem("visiq_guest_queries", "0"));
   });
 
   const [sessions, setSessions] = useState(() => {
     try {
-      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
+      const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
       if (savedUser?.isGuest) {
         return [DEFAULT_GUEST_SESSION];
       }
@@ -85,24 +89,10 @@ export default function App() {
     return [];
   });
   const [activeSessionId, setActiveSessionId] = useState(() => {
-    try {
-      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
-      if (savedUser?.isGuest) {
-        return localStorage.getItem("activeSessionId") || "demo_guest_netflix";
-      }
-    } catch {}
-    return localStorage.getItem("activeSessionId") || null;
+    return safeStorage.getItem("activeSessionId", null);
   });
   const [activeTab, setActiveTab] = useState("chat");
-  const [availableDatasets, setAvailableDatasets] = useState(() => {
-    try {
-      const savedUser = JSON.parse(localStorage.getItem("visiq_current_user") || "null");
-      if (savedUser?.isGuest) {
-        return [DEFAULT_NETFLIX_DATASET];
-      }
-    } catch {}
-    return [];
-  });
+  const [availableDatasets, setAvailableDatasets] = useState([]);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [messages, setMessages] = useState([]);
 
@@ -114,21 +104,21 @@ export default function App() {
   const [chartEnabled, setChartEnabled] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("darkMode") !== "false"
-  );
-  const [selectedModel, setSelectedModel] = useState(
-    () => localStorage.getItem("selectedModel") || "groq"
-  );
-  const [activeModel, setActiveModel] = useState(
-    () => localStorage.getItem("selectedModel") || "groq"
-  );
-  const [chartTheme, setChartTheme] = useState(
-    () => localStorage.getItem("darkMode") === "false" ? "light" : "dark"
-  );
+  const [darkMode, setDarkMode] = useState(() => {
+    return safeStorage.getItem("darkMode") !== "false";
+  });
+  const [selectedModel, setSelectedModel] = useState(() => {
+    return safeStorage.getItem("selectedModel", "groq");
+  });
+  const [activeModel, setActiveModel] = useState(() => {
+    return safeStorage.getItem("selectedModel", "groq");
+  });
+  const [chartTheme, setChartTheme] = useState(() => {
+    return safeStorage.getItem("darkMode") === "false" ? "light" : "dark";
+  });
 
   const activeSession = sessions.find((s) => s.session_id === activeSessionId) || null;
-  const activeDatasetName = activeSession?.dataset_name || (currentUser?.isGuest ? "netflix_titles.csv" : null);
+  const activeDatasetName = activeSession?.dataset_name || null;
   const guestQueriesRemaining = Math.max(0, MAX_GUEST_QUERIES - guestQueriesCount);
 
   // Dark mode effect
@@ -153,18 +143,12 @@ export default function App() {
   const loadDatasets = useCallback(() => {
     fetchDatasets()
       .then((data) => {
-        let list = data || [];
-        if (currentUser?.isGuest && !list.some((d) => d.name === "netflix_titles.csv")) {
-          list = [DEFAULT_NETFLIX_DATASET, ...list];
-        }
-        setAvailableDatasets(list);
+        setAvailableDatasets(data || []);
       })
       .catch(() => {
-        if (currentUser?.isGuest) {
-          setAvailableDatasets([DEFAULT_NETFLIX_DATASET]);
-        }
+        setAvailableDatasets([]);
       });
-  }, [currentUser]);
+  }, []);
 
   // When currentUser changes: synchronize auth token, reload datasets, sessions & quota
   useEffect(() => {
@@ -186,56 +170,11 @@ export default function App() {
     }
     localStorage.setItem("visiq_current_user", JSON.stringify(currentUser));
 
-    // If guest user, immediately activate Netflix session and chat view so the user never sees a blank screen
-    if (currentUser?.isGuest) {
-      setSessions((prev) =>
-        prev.some((s) => s.dataset_name === "netflix_titles.csv")
-          ? prev
-          : [DEFAULT_GUEST_SESSION, ...prev]
-      );
-      setActiveSessionId((prev) => prev || "demo_guest_netflix");
-      setActiveTab("chat");
-      setAvailableDatasets((prev) =>
-        prev.some((d) => d.name === "netflix_titles.csv")
-          ? prev
-          : [DEFAULT_NETFLIX_DATASET, ...prev]
-      );
-    }
-
     loadDatasets();
 
     fetchSessions()
-      .then(async (sessionList) => {
-        let list = sessionList || [];
-        // If guest user, ensure Netflix session exists and is active immediately
-        if (currentUser?.isGuest) {
-          let netflixSession = list.find((s) => s.dataset_name === "netflix_titles.csv");
-          if (!netflixSession) {
-            try {
-              netflixSession = await createSession("netflix_titles.csv", "Netflix Catalog Analysis");
-              list = [netflixSession, ...list];
-            } catch (err) {
-              console.warn("Backend session creation deferred; using local demo session:", err);
-            }
-          }
-          if (netflixSession) {
-            setSessions(list);
-            setActiveSessionId(netflixSession.session_id);
-            localStorage.setItem("activeSessionId", netflixSession.session_id);
-            setActiveTab("chat");
-          } else {
-            setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
-            setActiveSessionId((prev) => prev || "demo_guest_netflix");
-            setActiveTab("chat");
-          }
-
-          // Trigger guided tour for first-time visitors
-          if (!localStorage.getItem("hasSeenTour")) {
-            setTimeout(() => setShowProductTour(true), 700);
-          }
-          return;
-        }
-
+      .then((sessionList) => {
+        const list = sessionList || [];
         setSessions(list);
         if (list.length > 0) {
           const savedId = localStorage.getItem("activeSessionId");
@@ -250,57 +189,87 @@ export default function App() {
       })
       .catch((err) => {
         console.warn("Failed to fetch sessions:", err);
-        if (currentUser?.isGuest) {
-          setSessions((prev) => (prev.length > 0 ? prev : [DEFAULT_GUEST_SESSION]));
-          setActiveSessionId((prev) => prev || "demo_guest_netflix");
-          setActiveTab("chat");
-          if (!localStorage.getItem("hasSeenTour")) {
-            setTimeout(() => setShowProductTour(true), 600);
-          }
-        }
+        setSessions([]);
+        setActiveSessionId(null);
+        localStorage.removeItem("activeSessionId");
       });
 
     loadQuota();
   }, [currentUser, loadDatasets, loadQuota]);
 
-  // Live Supabase Auth Subscription
+  // Listen for global auth errors (e.g. expired tokens) to prompt sign-in cleanly
+  useEffect(() => {
+    const handleAuthError = () => {
+      setAuthToken(null);
+      setCurrentUser(null);
+      setActiveSessionId(null);
+      setShowAuthModal(true);
+      setAuthModalBanner("Your session has expired. Please sign in with username/password or continue as Guest.");
+    };
+    window.addEventListener("visiq:auth_error", handleAuthError);
+    return () => window.removeEventListener("visiq:auth_error", handleAuthError);
+  }, []);
+
+  // Live Supabase Auth Subscription (safely guarded against Brave Shields and adblockers)
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setAuthToken(session.access_token);
-          const u = {
-            id: session.user.id,
-            token: session.access_token,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
-            avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
-            role: "Supabase User",
-            isGuest: false,
-          };
-          setCurrentUser(u);
-        }
-      });
+      try {
+        supabase.auth
+          .getSession()
+          .then((res) => {
+            const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
+            if (savedUser?.isAdmin || savedUser?.isGuest) {
+              return;
+            }
+            const session = res?.data?.session;
+            if (session?.user) {
+              setAuthToken(session.access_token);
+              const u = {
+                id: session.user.id,
+                token: session.access_token,
+                email: session.user.email,
+                name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+                avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
+                role: "Supabase User",
+                isGuest: false,
+              };
+              setCurrentUser(u);
+            }
+          })
+          .catch((err) => {
+            console.warn("Supabase session check bypassed (e.g. Brave Shields blocked):", err);
+          });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (session) {
-          setAuthToken(session.access_token);
-          const u = {
-            id: session.user.id,
-            token: session.access_token,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
-            avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
-            role: "Supabase User",
-            isGuest: false,
-          };
-          setCurrentUser(u);
-        } else if (event === "SIGNED_OUT") {
-          setCurrentUser(null);
-        }
-      });
+        const authChangeResult = supabase.auth.onAuthStateChange((event, session) => {
+          const savedUser = JSON.parse(safeStorage.getItem("visiq_current_user") || "null");
+          if (savedUser?.isAdmin || savedUser?.isGuest) {
+            return;
+          }
+          if (session?.user) {
+            setAuthToken(session.access_token);
+            const u = {
+              id: session.user.id,
+              token: session.access_token,
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+              avatar: (session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || "U").toUpperCase(),
+              role: "Supabase User",
+              isGuest: false,
+            };
+            setCurrentUser(u);
+          } else if (event === "SIGNED_OUT") {
+            setCurrentUser(null);
+          }
+        });
 
-      return () => subscription?.unsubscribe();
+        return () => {
+          try {
+            authChangeResult?.data?.subscription?.unsubscribe();
+          } catch {}
+        };
+      } catch (err) {
+        console.warn("Supabase auth subscription failed:", err);
+      }
     }
   }, []);
 
@@ -357,44 +326,81 @@ export default function App() {
   }, []);
 
   const handleNewChatClick = useCallback(() => {
-    if (currentUser?.isGuest) {
-      setAuthModalBanner(
-        "Sign in with Google or Email to create multiple custom workspaces and upload private CSV files."
-      );
-      setShowAuthModal(true);
-      return;
-    }
     setShowNewChatModal(true);
-  }, [currentUser]);
+  }, []);
 
   const handleConfirmNewChat = useCallback(
-    async ({ file, datasetName, title }) => {
+    async ({ file, title }) => {
       try {
-        let targetDataset = datasetName;
-        if (file) {
-          if (currentUser?.isGuest) {
-            setAuthModalBanner("Guest accounts cannot upload private datasets. Please sign in with Google or Email.");
-            setShowAuthModal(true);
-            return;
-          }
-          const fileContent = await file.text();
-          const uploadRes = await uploadDataset(file.name, fileContent);
-          targetDataset = uploadRes.name || uploadRes.filename || file.name;
-          const updatedDatasets = await fetchDatasets();
-          setAvailableDatasets(updatedDatasets);
-        }
-
-        if (!targetDataset) {
-          alert("Please select a valid CSV file.");
+        if (!file) {
+          alert("Please select or drop a valid CSV file.");
           return;
         }
+
+        const fileContent = await file.text();
+        const lines = fileContent.trim().split(/\r?\n/).filter(Boolean);
+        const headers = lines[0] ? lines[0].split(",").map((h) => h.trim().replace(/^["']|["']$/g, "")) : [];
+        const rowCount = Math.max(0, lines.length - 1);
+
+        // Register client-side dataset immediately for instant preview / Vercel offline support
+        registerClientDataset(file.name, fileContent);
+
+        let targetDataset = file.name;
+        let isUploaded = false;
+
+        try {
+          const uploadRes = await uploadDataset(file.name, fileContent);
+          targetDataset = uploadRes.name || uploadRes.filename || file.name;
+          isUploaded = true;
+          const updatedDatasets = await fetchDatasets().catch(() => null);
+          if (updatedDatasets) {
+            setAvailableDatasets(updatedDatasets);
+          }
+        } catch (uploadErr) {
+          console.warn("Backend upload unreachable or failed; using client dataset mode:", uploadErr);
+        }
+
+        // Add to availableDatasets state
+        const datasetMetadata = {
+          name: targetDataset,
+          filename: targetDataset,
+          rows: rowCount,
+          columns: headers.length,
+          size_bytes: file.size,
+          is_private: true,
+        };
+        setAvailableDatasets((prev) => [
+          datasetMetadata,
+          ...prev.filter((d) => d.name.toLowerCase() !== targetDataset.toLowerCase()),
+        ]);
 
         const fallbackTitle = `${targetDataset
           .replace(/\.[^/.]+$/, "")
           .replace(/_/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase())} Workspace`;
 
-        const newSession = await createSession(targetDataset, title || fallbackTitle);
+        let newSession = null;
+        if (isUploaded) {
+          try {
+            newSession = await createSession(targetDataset, title || fallbackTitle);
+          } catch (sessErr) {
+            console.warn("Backend session creation failed:", sessErr);
+          }
+        }
+
+        if (!newSession) {
+          newSession = {
+            session_id: `session_${Date.now()}`,
+            dataset_name: targetDataset,
+            title: title || fallbackTitle,
+            created_at: new Date().toISOString(),
+            message_count: 0,
+            widget_count: 0,
+            token_usage: { ...DEFAULT_TOKEN_USAGE },
+            last_message: "",
+          };
+        }
+
         setSessions((prev) => [newSession, ...prev]);
         setActiveSessionId(newSession.session_id);
         setActiveTab("chat");
@@ -406,7 +412,8 @@ export default function App() {
         setShowNewChatModal(false);
       } catch (err) {
         console.error("Failed to create workspace:", err);
-        alert("Failed to create workspace. Please check the file and try again.");
+        const detail = err?.message || "Please check your file and try again.";
+        alert(`Failed to create workspace: ${detail}`);
       }
     },
     [currentUser]
@@ -417,9 +424,14 @@ export default function App() {
       await deleteSession(sessionId);
       setSessions((prev) => {
         const remaining = prev.filter((s) => s.session_id !== sessionId);
-        if (activeSessionId === sessionId && remaining.length > 0) {
-          setActiveSessionId(remaining[0].session_id);
-          localStorage.setItem("activeSessionId", remaining[0].session_id);
+        if (activeSessionId === sessionId) {
+          if (remaining.length > 0) {
+            setActiveSessionId(remaining[0].session_id);
+            localStorage.setItem("activeSessionId", remaining[0].session_id);
+          } else {
+            setActiveSessionId(null);
+            localStorage.removeItem("activeSessionId");
+          }
         }
         return remaining;
       });
@@ -466,13 +478,22 @@ export default function App() {
     async (question) => {
       if (!question.trim() || isStreaming) return;
 
-      // Guest query limit enforcement
-      if (currentUser?.isGuest && guestQueriesCount >= MAX_GUEST_QUERIES) {
-        setAuthModalBanner(
-          "You've reached your 5 free demo queries! Sign in with Google or Email for 50,000 daily tokens, unlimited chats, and private dataset uploads."
-        );
-        setShowAuthModal(true);
-        return;
+      // Query limit enforcement (10 queries max for regular users, admin has no restriction)
+      if (!currentUser?.isAdmin && !userQuota?.is_admin) {
+        const currentQueriesUsed = userQuota?.queries_used ?? (currentUser?.isGuest ? guestQueriesCount : 0);
+        const currentQueryLimit = userQuota?.query_limit ?? MAX_QUERIES_LIMIT;
+        if (currentQueriesUsed >= currentQueryLimit) {
+          const companyNotice = "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access.";
+          const userMsg = { id: ++messageId, role: "user", text: question };
+          const assistantMsg = {
+            id: ++messageId,
+            role: "assistant",
+            text: companyNotice,
+            operation: "error",
+          };
+          setMessages((prev) => [...prev, userMsg, assistantMsg]);
+          return;
+        }
       }
 
       const userMsg = { id: ++messageId, role: "user", text: question };
@@ -542,23 +563,22 @@ export default function App() {
           if (nextCount >= MAX_GUEST_QUERIES) {
             setTimeout(() => {
               setAuthModalBanner(
-                "You've completed your 5 free demo queries! Sign in with Google or Email to continue chatting and unlock 50,000 daily tokens."
+                "You have reached the limit of 10 queries. This platform is configured for internal company use and is not available for public access."
               );
-              setShowAuthModal(true);
-            }, 1500);
+            }, 1000);
           }
         }
       } catch (err) {
-        if (err.status === 429 || (err.message && err.message.toLowerCase().includes("budget"))) {
+        const errorText = err.message || "An error occurred while analyzing the dataset.";
+        if (err.status === 429 || errorText.toLowerCase().includes("budget") || errorText.toLowerCase().includes("company")) {
           setAuthModalBanner(
-            "You've reached your free guest demo limit. Sign in with Google or Email to unlock 50,000 daily tokens and custom uploads."
+            "Query limit reached (10/10). This AI data analyst is built for internal company use and is not intended for public access."
           );
-          setShowAuthModal(true);
         }
         const errorMsg = {
           id: ++messageId,
           role: "assistant",
-          text: err.message || "An error occurred while analyzing the dataset.",
+          text: errorText,
           operation: "error",
         };
         setMessages((prev) => [...prev, errorMsg]);
@@ -668,9 +688,9 @@ export default function App() {
               </div>
             ) : activeTab === "spreadsheet" ? (
               <SpreadsheetPanel
-                datasetName={activeDatasetName || "netflix_titles.csv"}
-                activeDatasetName={activeDatasetName || "netflix_titles.csv"}
-                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName) || availableDatasets[0]}
+                datasetName={activeDatasetName || ""}
+                activeDatasetName={activeDatasetName || ""}
+                datasetInfo={availableDatasets.find((d) => d.name === activeDatasetName) || null}
                 onDatasetUpdated={loadDatasets}
               />
             ) : (
@@ -698,22 +718,6 @@ export default function App() {
         canClose={Boolean(currentUser)}
         onUserChanged={(user) => {
           setCurrentUser(user);
-          if (user?.isGuest) {
-            setSessions([DEFAULT_GUEST_SESSION]);
-            setActiveSessionId(DEFAULT_GUEST_SESSION.session_id);
-            localStorage.setItem("activeSessionId", DEFAULT_GUEST_SESSION.session_id);
-            setActiveTab("chat");
-            setAvailableDatasets((prev) =>
-              prev.some((d) => d.name === "netflix_titles.csv")
-                ? prev
-                : [DEFAULT_NETFLIX_DATASET, ...prev]
-            );
-            setMessages([]);
-            setCharts([]);
-            if (!localStorage.getItem("hasSeenTour")) {
-              setTimeout(() => setShowProductTour(true), 600);
-            }
-          }
         }}
       />
 

@@ -42,8 +42,13 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "visiq-uploads")
 
-# Token Quota limits (per client/user daily allowance)
+# Token & Query Quota limits (per client/user daily allowance)
 DAILY_TOKEN_LIMIT = int(os.getenv("DAILY_TOKEN_LIMIT", "50000"))
+DAILY_QUERY_LIMIT = int(os.getenv("DAILY_QUERY_LIMIT", "10"))
+COMPANY_LIMIT_NOTICE = os.getenv(
+    "COMPANY_LIMIT_NOTICE",
+    "You have reached the maximum limit of 10 queries. This AI data analyst is built for internal company use and is not intended for public access."
+)
 
 # LLM Providers & Models
 DEFAULT_LLM_PROVIDER = os.getenv("DEFAULT_LLM_PROVIDER", "groq").lower()

@@ -103,8 +103,12 @@ class _SupabaseFileStore:
 
     def __init__(self, supabase_url: str, service_key: str, bucket: str,
                  uploads_dir: Path, knowledge_dir: Path):
-        from supabase import create_client
-        self._client = create_client(supabase_url, service_key)
+        try:
+            from supabase import create_client
+            self._client = create_client(supabase_url, service_key)
+        except ImportError as exc:
+            logger.error("The 'supabase' package is required for Supabase storage backend: %s", exc)
+            raise
         self._bucket = bucket
         self._tmp = Path(tempfile.mkdtemp(prefix="visiq_"))
         self._uploads_dir = uploads_dir
