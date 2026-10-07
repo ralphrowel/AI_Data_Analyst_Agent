@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { setAuthToken, loginWithPassword } from "../api";
+import PrivacyPolicyModal from "./PrivacyPolicyModal";
 
 export default function AuthModal({
   isOpen,
@@ -14,10 +15,37 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(() => {
+    try {
+      return localStorage.getItem("visiq_privacy_agreed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleToggleAgreement = (checked) => {
+    setAgreedToPrivacy(checked);
+    try {
+      if (checked) {
+        localStorage.setItem("visiq_privacy_agreed", "true");
+        if (error && error.includes("Privacy Policy")) {
+          setError("");
+        }
+      } else {
+        localStorage.removeItem("visiq_privacy_agreed");
+      }
+    } catch {}
+  };
+
   const handleGuestExplore = () => {
+    if (!agreedToPrivacy) {
+      setError("Please review and agree to the Privacy Policy & Data Terms before logging in.");
+      return;
+    }
+
     const guestAccount = {
       id: "user_default",
       email: "guest@visiq.ai",
@@ -37,6 +65,11 @@ export default function AuthModal({
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password) return;
+
+    if (!agreedToPrivacy) {
+      setError("Please review and agree to the Privacy Policy & Data Terms before logging in.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -123,6 +156,46 @@ export default function AuthModal({
               </div>
             </div>
           )}
+
+          {/* Privacy & Policy Agreement Gate */}
+          <div
+            className={`mb-5 p-3.5 rounded-xl border transition-all ${
+              agreedToPrivacy
+                ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/30"
+                : "bg-surface-50 dark:bg-gray-800/80 border-surface-200 dark:border-gray-700 ring-1 ring-accent/20"
+            }`}
+          >
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={agreedToPrivacy}
+                onChange={(e) => handleToggleAgreement(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded text-accent focus:ring-accent border-surface-300 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer accent-accent shrink-0"
+              />
+              <div className="text-xs leading-relaxed flex-1">
+                <span className="font-medium text-surface-800 dark:text-gray-200">
+                  I agree to the{" "}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowPrivacyModal(true);
+                  }}
+                  className="font-bold text-accent hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Privacy Policy & Data Terms</span>
+                  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </button>
+                <p className="text-[11px] text-surface-500 dark:text-gray-400 mt-1">
+                  Tenant data isolation, zero AI training on your CSV datasets, and deterministic Pandas execution.
+                </p>
+              </div>
+            </label>
+          </div>
 
           {/* Primary Explore as Guest Card */}
           <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-accent/15 via-accent/5 to-transparent border border-accent/30 shadow-xs">
@@ -239,7 +312,31 @@ export default function AuthModal({
             </form>
           </div>
         </div>
+
+        {/* Footer with Privacy Policy link */}
+        <div className="px-6 py-3 border-t border-surface-100 dark:border-gray-800 bg-surface-50/50 dark:bg-gray-800/40 flex items-center justify-between text-xs text-surface-400 dark:text-gray-500">
+          <button
+            type="button"
+            onClick={() => setShowPrivacyModal(true)}
+            className="hover:text-accent transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+          >
+            <svg className="w-3.5 h-3.5 text-accent/80 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+            <span>Review Privacy Policy</span>
+          </button>
+          <span className="text-[10px] uppercase font-mono tracking-wider opacity-75">
+            Enterprise Compliance
+          </span>
+        </div>
       </div>
+
+      {/* Full Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+        onAccept={() => handleToggleAgreement(true)}
+      />
     </div>
   );
 }

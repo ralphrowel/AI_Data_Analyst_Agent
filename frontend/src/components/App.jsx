@@ -25,6 +25,7 @@ import NewChatModal from "./NewChatModal";
 import HomePage from "./HomePage";
 import AuthModal from "./AuthModal";
 import ProductTour from "./ProductTour";
+import PrivacyPolicyModal from "./PrivacyPolicyModal";
 
 let messageId = 0;
 
@@ -76,6 +77,7 @@ export default function App() {
   });
   const [authModalBanner, setAuthModalBanner] = useState("");
   const [showProductTour, setShowProductTour] = useState(false);
+  const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
   const [guestQueriesCount, setGuestQueriesCount] = useState(() => {
     return Number(safeStorage.getItem("visiq_guest_queries", "0"));
   });
@@ -612,6 +614,7 @@ export default function App() {
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChatClick}
         onDeleteSession={handleDeleteSession}
+        onOpenPrivacyPolicy={() => setShowPrivacyPolicyModal(true)}
       />
 
       {/* Main Content Area */}
@@ -736,6 +739,11 @@ export default function App() {
         isOpen={showProductTour}
         onClose={() => setShowProductTour(false)}
         onSelectTab={setActiveTab}
+      />
+
+      <PrivacyPolicyModal
+        isOpen={showPrivacyPolicyModal}
+        onClose={() => setShowPrivacyPolicyModal(false)}
       />
     </div>
   );
