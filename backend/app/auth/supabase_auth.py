@@ -3,6 +3,7 @@ import os
 import json
 import logging
 from typing import Optional, Dict, Any
+from functools import lru_cache
 import jwt
 import httpx
 from pydantic import BaseModel
@@ -54,43 +55,67 @@ DEMO_USERS = {
 }
 
 
-from functools import lru_cache
 @lru_cache
-def _jwks(issuer):
-    return jwt.PyJWKClient(issuer + '/.well-known/jwks.json', timeout=5)
+def _jwks(issuer: str):
+    return jwt.PyJWKClient(issuer.rstrip("/") + "/.well-known/jwks.json", timeout=5)
+
 
 def _decode_jwt_token(token: str) -> User:
     if config.ALLOW_DEMO_AUTH and token in DEMO_USERS:
         return DEMO_USERS[token]
     try:
         if not SUPABASE_URL:
-            raise ValueError('Authentication is not configured')
-        issuer = SUPABASE_URL.rstrip('/') + '/auth/v1'
-        if SUPABASE_JWT_SECRET:
-            key, algorithms = SUPABASE_JWT_SECRET, ['HS256']
+            raise ValueError("Authentication is not configured")
+
+        unverified_header = jwt.get_unverified_header(token)
+        alg = unverified_header.get("alg", "HS256")
+        issuer = SUPABASE_URL.rstrip("/") + "/auth/v1"
+
+        if alg == "HS256" and SUPABASE_JWT_SECRET:
+            key, algorithms = SUPABASE_JWT_SECRET, ["HS256"]
         else:
-            key, algorithms = _jwks(issuer).get_signing_key_from_jwt(token).key, ['RS256', 'ES256']
-        payload = jwt.decode(token, key, algorithms=algorithms, issuer=issuer,
-            audience='authenticated', options={'require': ['exp', 'iat', 'sub', 'iss', 'aud']})
+            key = _jwks(issuer).get_signing_key_from_jwt(token).key
+            algorithms = [alg]
+
+        payload = jwt.decode(
+            token,
+            key,
+            algorithms=algorithms,
+            audience="authenticated",
+            options={"require": ["exp", "iat", "sub", "aud"], "verify_iss": False},
+        )
+
+        iss = payload.get("iss", "")
+        expected_base = SUPABASE_URL.rstrip("/").lower()
+        if not iss.lower().startswith(expected_base):
+            raise ValueError(f"Invalid issuer: {iss}")
+
         from backend.app.paths import filename
-        subject = filename(payload['sub'])
-        if payload.get('role') != 'authenticated':
-            raise ValueError('Invalid role')
-        return User(id=subject, email=payload.get('email', ''), user_metadata=payload.get('user_metadata') or {})
-    except Exception:
-        raise HTTPException(status_code=401, detail='Invalid authentication credentials', headers={'WWW-Authenticate': 'Bearer'})
+        subject = filename(payload["sub"])
+        if payload.get("role") != "authenticated":
+            raise ValueError("Invalid role")
+        return User(id=subject, email=payload.get("email", ""), user_metadata=payload.get("user_metadata") or {})
+    except Exception as exc:
+        logger.warning("Token verification failed (%s): %s", type(exc).__name__, exc)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     if not credentials or not credentials.credentials:
-        raise HTTPException(status_code=401, detail='Authentication required', headers={'WWW-Authenticate': 'Bearer'})
+        raise HTTPException(status_code=401, detail="Authentication required", headers={"WWW-Authenticate": "Bearer"})
     user = await run_in_threadpool(_decode_jwt_token, credentials.credentials.strip())
     from backend.app import storage
-    await run_in_threadpool(storage.put, 'users', user.id, user.id, user.model_dump())
+    await run_in_threadpool(storage.put, "users", user.id, user.id, user.model_dump())
     from backend.app.auth.context import request_user_id
     context_token = request_user_id.set(user.id)
     try:
         yield user
     finally:
         request_user_id.reset(context_token)
+
 
 get_optional_user = get_current_user

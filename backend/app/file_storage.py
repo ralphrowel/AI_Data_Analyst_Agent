@@ -153,22 +153,34 @@ class _SupabaseFileStore:
 
     def save(self, user_id: str, filename: str, content: str, kind: str = "csv") -> Path:
         from backend.app.paths import atomic_text
-        data = content.encode("utf-8")
-        remote = self._remote_path(user_id, filename, kind)
-        self._client.storage.from_(self._bucket).upload(
-            remote, data,
-            file_options={"content-type": "text/plain", "upsert": "true"},
-        )
+        # Write locally first so the local server and pandas have immediate access
         local = self._local_mirror(user_id, filename, kind)
         atomic_text(local, content)
-        logger.info(f"Saved {remote} to Supabase Storage and mirrored locally")
+
+        # Mirror to Supabase storage safely
+        try:
+            data = content.encode("utf-8")
+            remote = self._remote_path(user_id, filename, kind)
+            self._client.storage.from_(self._bucket).upload(
+                remote, data,
+                file_options={"content-type": "text/plain", "upsert": "true"},
+            )
+            logger.info(f"Saved {remote} to Supabase Storage and mirrored locally")
+        except Exception as exc:
+            logger.warning(f"Could not mirror {filename} to Supabase Storage: {exc}")
         return local
 
     def load(self, user_id: str, filename: str, kind: str = "csv") -> Optional[str]:
+        # Check local mirror first
+        local = self._local_mirror(user_id, filename, kind)
+        if local.exists() and local.stat().st_size > 0:
+            try:
+                return local.read_text(encoding="utf-8")
+            except Exception:
+                pass
         remote = self._remote_path(user_id, filename, kind)
         try:
             data: bytes = self._client.storage.from_(self._bucket).download(remote)
-            local = self._local_mirror(user_id, filename, kind)
             local.write_bytes(data)
             return data.decode("utf-8")
         except Exception as e:
@@ -176,18 +188,27 @@ class _SupabaseFileStore:
             return None
 
     def delete(self, user_id: str, filename: str, kind: str = "csv") -> None:
-        remote = self._remote_path(user_id, filename, kind)
-        try:
-            self._client.storage.from_(self._bucket).remove([remote])
-        except Exception as e:
-            logger.warning(f"Could not delete {remote}: {e}")
         try:
             local = self._local_mirror(user_id, filename, kind)
             local.unlink(missing_ok=True)
         except Exception:
             pass
+        remote = self._remote_path(user_id, filename, kind)
+        try:
+            self._client.storage.from_(self._bucket).remove([remote])
+        except Exception as e:
+            logger.warning(f"Could not delete {remote}: {e}")
 
     def list_files(self, user_id: str, kind: str = "csv") -> list[Path]:
+        # Fast path: check local disk mirror first (sub-millisecond)
+        base = self.knowledge_dir if kind == "doc" else self.uploads_dir
+        user_dir = base / user_id
+        if user_dir.exists():
+            files = [p for p in user_dir.glob("*.csv" if kind == "csv" else "*.*") if p.is_file()]
+            if files:
+                return files
+
+        # Fallback to remote list for fresh containers
         prefix = f"{kind}/{user_id}"
         try:
             items = self._client.storage.from_(self._bucket).list(prefix)
@@ -230,13 +251,19 @@ def _make_store():
         SUPABASE_SERVICE_KEY, SUPABASE_STORAGE_BUCKET, APP_ENV,
     )
     if APP_ENV != "test" and SUPABASE_SERVICE_KEY and SUPABASE_URL:
-        return _SupabaseFileStore(
-            supabase_url=SUPABASE_URL,
-            service_key=SUPABASE_SERVICE_KEY,
-            bucket=SUPABASE_STORAGE_BUCKET,
-            uploads_dir=UPLOADS_DIR,
-            knowledge_dir=KNOWLEDGE_DIR,
-        )
+        try:
+            return _SupabaseFileStore(
+                supabase_url=SUPABASE_URL,
+                service_key=SUPABASE_SERVICE_KEY,
+                bucket=SUPABASE_STORAGE_BUCKET,
+                uploads_dir=UPLOADS_DIR,
+                knowledge_dir=KNOWLEDGE_DIR,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to initialize Supabase storage (%s); falling back to local file store.",
+                exc,
+            )
     logger.info("Using local filesystem for file storage.")
     return _LocalFileStore(uploads_dir=UPLOADS_DIR, knowledge_dir=KNOWLEDGE_DIR)
 

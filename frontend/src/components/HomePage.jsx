@@ -42,6 +42,12 @@ export default function HomePage({
 
   useEffect(() => {
     let isMounted = true;
+    if (!currentUser) {
+      setRecentGraphs([]);
+      setDatasetChanges([]);
+      setIsLoading(false);
+      return;
+    }
     Promise.all([
       fetchRecentGraphs(6).catch(() => []),
       fetchDatasetChanges().catch(() => []),
@@ -55,7 +61,7 @@ export default function HomePage({
     return () => {
       isMounted = false;
     };
-  }, [sessions, availableDatasets]);
+  }, [sessions, availableDatasets, currentUser]);
 
   // Datasets linked to active conversations
   const sessionDatasetNames = new Set((sessions || []).map((s) => (s.dataset_name || "").toLowerCase()));

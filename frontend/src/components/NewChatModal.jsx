@@ -124,20 +124,31 @@ export default function NewChatModal({
               ref={fileInputRef}
               type="file"
               accept=".csv"
+              disabled={isSubmitting}
               onChange={handleFileChange}
               className="hidden"
             />
             <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                isDragging
-                  ? "border-accent bg-accent/10 dark:bg-accent/15"
+              onClick={() => {
+                if (!isSubmitting) fileInputRef.current?.click();
+              }}
+              onDragOver={(e) => {
+                if (!isSubmitting) handleDragOver(e);
+              }}
+              onDragLeave={(e) => {
+                if (!isSubmitting) handleDragLeave(e);
+              }}
+              onDrop={(e) => {
+                if (!isSubmitting) handleDrop(e);
+              }}
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                isSubmitting
+                  ? "opacity-80 cursor-wait border-accent/40 bg-accent/5 dark:bg-accent/10"
+                  : isDragging
+                  ? "cursor-pointer border-accent bg-accent/10 dark:bg-accent/15"
                   : localFile
-                  ? "border-accent/50 bg-accent/5 dark:bg-accent/10"
-                  : "border-surface-300 dark:border-gray-700 hover:border-accent dark:hover:border-accent bg-surface-50 dark:bg-gray-950/50"
+                  ? "cursor-pointer border-accent/50 bg-accent/5 dark:bg-accent/10"
+                  : "cursor-pointer border-surface-300 dark:border-gray-700 hover:border-accent dark:hover:border-accent bg-surface-50 dark:bg-gray-950/50"
               }`}
             >
               {localFile ? (
@@ -155,13 +166,15 @@ export default function NewChatModal({
                       {formatSize(localFile.size)} • Ready for analysis
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleResetFile}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md text-surface-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Change file
-                  </button>
+                  {!isSubmitting && (
+                    <button
+                      type="button"
+                      onClick={handleResetFile}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md text-surface-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                    >
+                      Change file
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -191,9 +204,12 @@ export default function NewChatModal({
             <input
               type="text"
               value={customTitle}
+              disabled={isSubmitting}
               onChange={(e) => setCustomTitle(e.target.value)}
               placeholder="e.g., Tech Salaries Analysis"
-              className="w-full text-xs px-3 py-2 rounded-lg bg-surface-50 dark:bg-gray-950 border border-surface-200 dark:border-gray-700 text-surface-800 dark:text-gray-100 placeholder-surface-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              className={`w-full text-xs px-3 py-2 rounded-lg bg-surface-50 dark:bg-gray-950 border border-surface-200 dark:border-gray-700 text-surface-800 dark:text-gray-100 placeholder-surface-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent ${
+                isSubmitting ? "opacity-60 cursor-not-allowed" : ""
+              }`}
             />
           </div>
 
@@ -216,7 +232,17 @@ export default function NewChatModal({
                   : "bg-accent hover:opacity-90 cursor-pointer"
               }`}
             >
-              {isSubmitting ? "Creating..." : "Start Conversation"}
+              {isSubmitting ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <svg className="animate-spin -ml-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Creating Workspace...</span>
+                </span>
+              ) : (
+                "Start Conversation"
+              )}
             </button>
           </div>
         </form>

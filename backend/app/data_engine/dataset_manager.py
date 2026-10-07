@@ -99,12 +99,23 @@ class DatasetManager:
                 try:
                     p = self._resolve_path(fname, user_id=user_id)
                     stat = p.stat()
-                    df = self.get_dataset(fname, user_id=user_id)
+                    cache_k = self._cache_key(fname, user_id)
+                    if cache_k in self._cache:
+                        df = self._cache[cache_k]
+                        row_cnt, col_cnt = int(len(df)), int(len(df.columns))
+                    else:
+                        cached = storage.get('datasets', user_id, fname)
+                        if cached and cached.get('rows') is not None and cached.get('columns') is not None:
+                            row_cnt, col_cnt = int(cached['rows']), int(cached['columns'])
+                        else:
+                            df = self.get_dataset(fname, user_id=user_id)
+                            row_cnt, col_cnt = int(len(df)), int(len(df.columns))
+
                     mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
                     datasets.append({
                         "name": fname,
-                        "rows": int(len(df)),
-                        "columns": int(len(df.columns)),
+                        "rows": row_cnt,
+                        "columns": col_cnt,
                         "size_bytes": int(stat.st_size),
                         "modified_at": mtime_iso,
                         "is_private": True,
@@ -120,12 +131,23 @@ class DatasetManager:
                     continue
                 try:
                     stat = file_path.stat()
-                    df = self.get_dataset(file_path.name)
+                    cache_k = self._cache_key(file_path.name)
+                    if cache_k in self._cache:
+                        df = self._cache[cache_k]
+                        row_cnt, col_cnt = int(len(df)), int(len(df.columns))
+                    else:
+                        cached = storage.get('datasets', 'shared', file_path.name)
+                        if cached and cached.get('rows') is not None and cached.get('columns') is not None:
+                            row_cnt, col_cnt = int(cached['rows']), int(cached['columns'])
+                        else:
+                            df = self.get_dataset(file_path.name)
+                            row_cnt, col_cnt = int(len(df)), int(len(df.columns))
+
                     mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
                     datasets.append({
                         "name": file_path.name,
-                        "rows": int(len(df)),
-                        "columns": int(len(df.columns)),
+                        "rows": row_cnt,
+                        "columns": col_cnt,
                         "size_bytes": int(stat.st_size),
                         "modified_at": mtime_iso,
                         "is_private": False,

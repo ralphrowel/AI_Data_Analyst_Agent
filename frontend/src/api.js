@@ -46,12 +46,17 @@ function authHeaders(extra = {}) {
   return headers;
 }
 
+let isAuthFailureHandling = false;
 export function handleAuthFailure(status) {
-  if (status === 401) {
+  if (status === 401 && !isAuthFailureHandling) {
+    isAuthFailureHandling = true;
     setAuthToken(null);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("visiq:auth_error"));
     }
+    setTimeout(() => {
+      isAuthFailureHandling = false;
+    }, 1500);
   }
 }
 

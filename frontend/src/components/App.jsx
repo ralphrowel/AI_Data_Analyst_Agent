@@ -59,6 +59,21 @@ const DEFAULT_TOKEN_USAGE = {
   groq_tokens: 0,
 };
 
+function isJwtExpired(token) {
+  if (!token) return true;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const MAX_QUERIES_LIMIT = 10;
 const MAX_GUEST_QUERIES = 10;
 
@@ -66,7 +81,16 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = safeStorage.getItem("visiq_current_user");
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u?.token && isJwtExpired(u.token) && !u.isAdmin && !u.isGuest) {
+          safeStorage.removeItem("visiq_current_user");
+          safeStorage.removeItem("visiq_auth_token");
+          return null;
+        }
+        return u;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -205,7 +229,14 @@ export default function App() {
     const handleAuthError = () => {
       setAuthToken(null);
       setCurrentUser(null);
+      safeStorage.removeItem("visiq_current_user");
+      safeStorage.removeItem("visiq_auth_token");
       setActiveSessionId(null);
+      if (isSupabaseConfigured && supabase) {
+        try {
+          supabase.auth.signOut().catch(() => {});
+        } catch {}
+      }
       setShowAuthModal(true);
       setAuthModalBanner("Your session has expired. Please sign in with username/password or continue as Guest.");
     };
@@ -225,7 +256,11 @@ export default function App() {
               return;
             }
             const session = res?.data?.session;
-            if (session?.user) {
+            if (session?.user && session?.access_token) {
+              if (isJwtExpired(session.access_token)) {
+                supabase.auth.signOut().catch(() => {});
+                return;
+              }
               setAuthToken(session.access_token);
               const u = {
                 id: session.user.id,
@@ -248,7 +283,11 @@ export default function App() {
           if (savedUser?.isAdmin || savedUser?.isGuest) {
             return;
           }
-          if (session?.user) {
+          if (session?.user && session?.access_token) {
+            if (isJwtExpired(session.access_token)) {
+              supabase.auth.signOut().catch(() => {});
+              return;
+            }
             setAuthToken(session.access_token);
             const u = {
               id: session.user.id,
@@ -355,10 +394,10 @@ export default function App() {
           const uploadRes = await uploadDataset(file.name, fileContent);
           targetDataset = uploadRes.name || uploadRes.filename || file.name;
           isUploaded = true;
-          const updatedDatasets = await fetchDatasets().catch(() => null);
-          if (updatedDatasets) {
-            setAvailableDatasets(updatedDatasets);
-          }
+          // Refresh catalog asynchronously in background without blocking session creation
+          fetchDatasets().then((updated) => {
+            if (updated) setAvailableDatasets(updated);
+          }).catch(() => {});
         } catch (uploadErr) {
           console.warn("Backend upload unreachable or failed; using client dataset mode:", uploadErr);
         }
