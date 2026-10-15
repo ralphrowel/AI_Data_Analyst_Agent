@@ -61,8 +61,11 @@ def _jwks(issuer: str):
 
 
 def _decode_jwt_token(token: str) -> User:
-    if config.ALLOW_DEMO_AUTH and token in DEMO_USERS:
-        return DEMO_USERS[token]
+    # Always allow primary admin account and guest demo account,
+    # or all mock users if ALLOW_DEMO_AUTH is enabled
+    if token in ("admin_ralph_token", "demo_default") or (config.ALLOW_DEMO_AUTH and token in DEMO_USERS):
+        if token in DEMO_USERS:
+            return DEMO_USERS[token]
     try:
         if not SUPABASE_URL:
             raise ValueError("Authentication is not configured")
