@@ -397,6 +397,7 @@ class CleaningResult:
     before_stats: Dict[str, Any]
     after_stats: Dict[str, Any]
     delta: Dict[str, Any]
+    quarantine_df: Optional[Any] = None  # Optional pd.DataFrame of quarantined rows
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -405,6 +406,7 @@ class CleaningResult:
             "delta": self.delta,
             "audit": self.audit.to_dict(),
             "steps": [step.to_dict() for step in self.steps],
+            "quarantined_rows": len(self.quarantine_df) if self.quarantine_df is not None else 0,
         }
 
     def to_json(self, indent: int = 2) -> str:
@@ -427,6 +429,7 @@ class CleaningJob:
     score_delta: float
     user_id: Optional[str] = None
     created_at: str = field(default_factory=current_utc_iso)
+    quarantine_dataset: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -442,6 +445,7 @@ class CleaningJob:
             "score_before": self.score_before.to_dict(),
             "score_after": self.score_after.to_dict(),
             "score_delta": self.score_delta,
+            "quarantine_dataset": self.quarantine_dataset,
         }
 
     def to_json(self, indent: int = 2) -> str:
@@ -462,7 +466,9 @@ class CleaningJob:
             score_before=QualityScoreResult.from_dict(data["score_before"]),
             score_after=QualityScoreResult.from_dict(data["score_after"]),
             score_delta=data.get("score_delta", 0.0),
+            quarantine_dataset=data.get("quarantine_dataset"),
         )
+
 
 
 @dataclass
