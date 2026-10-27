@@ -1,0 +1,98 @@
+[
+  {
+    "id": "ho_01_total_revenue",
+    "category": "aggregation",
+    "question": "What is the total gross revenue in PHP across all orders?",
+    "ground_truth_value": 3261497.92,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_02_total_orders",
+    "category": "aggregation",
+    "question": "How many total orders were completed?",
+    "ground_truth_value": 2500,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_03_total_quantity",
+    "category": "aggregation",
+    "question": "What is the total order quantity sold across all items?",
+    "ground_truth_value": 16593,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_04_average_order_value",
+    "category": "aggregation",
+    "question": "What is the average order value in PHP?",
+    "ground_truth_value": 1304.6,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_05_average_item_price",
+    "category": "aggregation",
+    "question": "What is the average item price in PHP?",
+    "ground_truth_value": 197.3,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_06_shopee_revenue",
+    "category": "filtered_lookup",
+    "question": "What is the total gross revenue from Shopee Mall?",
+    "ground_truth_value": 879505.11,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_07_tiktok_revenue",
+    "category": "filtered_lookup",
+    "question": "What is the total sales revenue from TikTok Shop in PHP?",
+    "ground_truth_value": 807311.47,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_08_lazada_revenue",
+    "category": "filtered_lookup",
+    "question": "What is the total sales amount in PHP from Lazada?",
+    "ground_truth_value": 749666.78,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_09_metro_manila_orders",
+    "category": "filtered_lookup",
+    "question": "How many orders were delivered to Metro Manila?",
+    "ground_truth_value": 630,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_10_central_luzon_orders",
+    "category": "filtered_lookup",
+    "question": "How many orders were delivered to Central Luzon?",
+    "ground_truth_value": 626,
+    "result_type": "number",
+    "tolerance_pct": 0.001
+  },
+  {
+    "id": "ho_11_top_merchant",
+    "category": "group_distribution",
+    "question": "Which merchant generated the highest gross revenue?",
+    "ground_truth_value": "P&G Beauty",
+    "result_type": "string",
+    "tolerance_pct": 0.0
+  },
+  {
+    "id": "ho_12_top_channel",
+    "category": "group_distribution",
+    "question": "Which sales channel generated the most gross revenue?",
+    "ground_truth_value": "Shopee Mall",
+    "result_type": "string",
+    "tolerance_pct": 0.0
+  }
+]

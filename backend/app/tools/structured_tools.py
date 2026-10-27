@@ -49,7 +49,7 @@ def filter_rows(
     op = str(operator).lower().strip()
     s = df[actual_col]
 
-    if op in ("eq", "equals", "=="):
+    if op in ("eq", "equals", "==", "="):
         # If both are numeric
         try:
             num_val = float(value)
@@ -63,19 +63,47 @@ def filter_rows(
     elif op in ("contains", "like"):
         return df[s.astype(str).str.contains(str(value), case=False, na=False)]
 
+    elif op == "between":
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            val1, val2 = value[0], value[1]
+        elif isinstance(value, str) and "," in value:
+            val1, val2 = [v.strip() for v in value.split(",", 1)]
+        else:
+            return df
+
+        if "date" in actual_col.lower():
+            dt_s = pd.to_datetime(s, errors="coerce")
+            d1 = pd.to_datetime(val1, errors="coerce")
+            d2 = pd.to_datetime(val2, errors="coerce")
+            return df[(dt_s >= d1) & (dt_s <= d2)]
+        else:
+            try:
+                num_s = pd.to_numeric(s, errors="coerce")
+                return df[(num_s >= float(val1)) & (num_s <= float(val2))]
+            except Exception:
+                return df[(s.astype(str) >= str(val1)) & (s.astype(str) <= str(val2))]
+
     elif op in ("gt", ">"):
+        if "date" in actual_col.lower():
+            return df[pd.to_datetime(s, errors="coerce") > pd.to_datetime(value, errors="coerce")]
         num_s = pd.to_numeric(s, errors="coerce")
         return df[num_s > float(value)]
 
     elif op in ("gte", ">="):
+        if "date" in actual_col.lower():
+            return df[pd.to_datetime(s, errors="coerce") >= pd.to_datetime(value, errors="coerce")]
         num_s = pd.to_numeric(s, errors="coerce")
         return df[num_s >= float(value)]
 
     elif op in ("lt", "<"):
+        if "date" in actual_col.lower():
+            return df[pd.to_datetime(s, errors="coerce") < pd.to_datetime(value, errors="coerce")]
         num_s = pd.to_numeric(s, errors="coerce")
         return df[num_s < float(value)]
 
     elif op in ("lte", "<="):
+        if "date" in actual_col.lower():
+            return df[pd.to_datetime(s, errors="coerce") <= pd.to_datetime(value, errors="coerce")]
         num_s = pd.to_numeric(s, errors="coerce")
         return df[num_s <= float(value)]
 

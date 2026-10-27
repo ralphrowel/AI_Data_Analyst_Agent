@@ -166,7 +166,8 @@ def extract_scalar_result(raw_result: Any, question_meta: Dict[str, Any]) -> Any
         q_text = question_meta["question"].lower()
         # If looking for top category/region (string)
         if result_type == "string":
-            # First key is top in group_data
+            if any(w in q_text for w in ["least", "lowest", "bottom", "min"]):
+                return list(raw_result.keys())[-1]
             return list(raw_result.keys())[0]
         # If looking for a specific group value
         gt_val = question_meta.get("ground_truth_value")

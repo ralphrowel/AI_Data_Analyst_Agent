@@ -220,11 +220,19 @@ graph TD
 - [x] **3.1.6:** Added comprehensive unit tests in `tests/test_dq_cleaner.py` (all 129 tests passing).
 - [x] **3.1.7:** Verified Vite production frontend build completes without errors.
 
-### Sprint 4 Checklist: Full Benchmark & Ablation Study Execution (Status: In Progress)
-- [ ] **4.1.1:** Run `eval_runner.py` across all 52 benchmark questions on the clean ground truth dataset.
-- [ ] **4.1.2:** Run `eval_runner.py` across all 52 benchmark questions on the raw dirty dataset.
-- [ ] **4.1.3:** Run `eval_runner.py` across all 52 benchmark questions on the fully cleaned dataset.
-- [ ] **4.1.4:** Execute the full 6-configuration ablation study via `scripts/eval_ablation.py` and output `benchmarks/results/ablation_summary.csv`.
-- [ ] **4.1.5:** Evaluate generalization on the held-out dirty dataset (`data/benchmarks/held_out_messy.csv`).
-- [ ] **4.1.6:** Author executive evaluation report documenting cross-model accuracy, crash rates, and per-cleaner impact.
+### Sprint 4 Checklist: Full Benchmark & Ablation Study Execution (Status: Complete)
+- [x] **4.1.1:** Ran `eval_runner.py` across all 52 benchmark questions on the clean ground truth dataset (Accuracy: **100.0%**, 52/52).
+- [x] **4.1.2:** Ran `eval_runner.py` across all 52 benchmark questions on the raw dirty dataset (Accuracy: **13.46%**, 7/52).
+- [x] **4.1.3:** Ran `eval_runner.py` across all 52 benchmark questions on the fully cleaned dataset (Accuracy: **100.0%**, 52/52).
+- [x] **4.1.4:** Executed the full 6-configuration ablation study via `scripts/eval_ablation.py` and output `benchmarks/results/ablation_summary.csv` (-76.9% drop without dedup, -59.6% without quarantine).
+- [x] **4.1.5:** Evaluated generalization on the held-out dirty dataset via `scripts/eval_held_out.py` (Raw 8.33% $\rightarrow$ Cleaned **75.00%**, +66.67 percentage points).
+- [x] **4.1.6:** Authored executive evaluation report in `docs/benchmark_results_report.md` documenting methodology, tables, and per-cleaner impact.
+
+### Sprint 5 Checklist: UI Polish & Multi-Tenant Deployment Hardening (Status: Up Next)
+- [ ] **5.1.1:** Verify `QualityPanel.jsx` allows smooth toggling between raw, cleaned, and quarantine versions in the UI.
+- [ ] **5.1.2:** Test guest and authenticated flows for dataset upload $\rightarrow$ profile $\rightarrow$ clean $\rightarrow$ query workflow.
+- [ ] **5.1.3:** Verify upload size limit enforcement ($5$ MB max) and quota management on Railway backend.
+- [ ] **5.1.4:** Ensure zero regression across all 129 test cases (`pytest`).
+- [ ] **5.1.5:** Verify clean production build on frontend (`vite build`).
+
 
