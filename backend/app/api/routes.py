@@ -22,7 +22,7 @@ from backend.app.api.schemas import (
     SwitchSessionDatasetRequest,
 )
 from backend.app.config import USE_LEGACY_AGENT, KNOWLEDGE_DIR
-from backend.app.agent.coordinator import default_coordinator
+from backend.app.agent.coordinator import default_coordinator, _resolve_quality_badge
 from backend.app.agent.widget_engine import default_widget_engine
 from backend.app.rag.retriever import get_user_retriever
 
@@ -618,6 +618,7 @@ def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)
         # Atomically record token and query consumption against user's daily quota
         default_quota_manager.record_query(current_user.id)
 
+        badge = _resolve_quality_badge(getattr(session, "dataset_name", None), user_id=current_user.id)
         return AnalysisResponse(
             summary=summary,
             chart_base64=chart_base64,
@@ -627,6 +628,7 @@ def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)
             unsupported_reason=None,
             usage=combined_usage,
             model_used=model_used,
+            quality_badge=badge,
         )
 
     # Modern Agent Coordinator pipeline (Step 7)
@@ -652,4 +654,5 @@ def ask(request: QuestionRequest, current_user: User = Depends(get_current_user)
         unsupported_reason=res.get("unsupported_reason"),
         usage=res.get("usage", {}),
         model_used=res.get("model_used", "gemini"),
+        quality_badge=res.get("quality_badge"),
     )

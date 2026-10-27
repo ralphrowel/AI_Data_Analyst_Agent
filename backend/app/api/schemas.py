@@ -32,6 +32,8 @@ class AnalysisResponse(BaseModel):
     unsupported_reason: Optional[str] = None
     usage: Dict[str, Any]
     model_used: str = "gemini"
+    quality_badge: Optional[Dict[str, Any]] = None
+
 
 
 class CreateSessionRequest(RequestModel):

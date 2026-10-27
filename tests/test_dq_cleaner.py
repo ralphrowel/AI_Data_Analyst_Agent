@@ -370,3 +370,119 @@ def test_lineage_endpoint(client, auth):
     assert "dataset_name" in data
     assert "role" in data
     assert "versions" in data
+
+
+# =========================================================================
+# 5. Sprint 3 Gap-Filling Cleaners & Quarantine Tests
+# =========================================================================
+
+def test_currency_cleaning():
+    """Cleaner converts currency strings with symbols and commas to numeric floats."""
+    engine = DataCleaningEngine()
+    df = pd.DataFrame(
+        {
+            "price": ["₱1,500.50", "PHP 250.00", "$45.99", "750", "N/A"],
+            "item": ["A", "B", "C", "D", "E"],
+        }
+    )
+    result = engine.clean(df, clean_currency_columns=["price"])
+    cleaned = result.cleaned_df
+
+    assert pd.api.types.is_float_dtype(cleaned["price"])
+    assert cleaned["price"].iloc[0] == 1500.50
+    assert cleaned["price"].iloc[1] == 250.00
+    assert cleaned["price"].iloc[2] == 45.99
+    assert cleaned["price"].iloc[3] == 750.0
+    assert pd.isna(cleaned["price"].iloc[4])
+    assert any(s.operation == "clean_currency" for s in result.steps)
+
+
+def test_quarantine_fatal_defects():
+    """Fatal defects are filtered from cleaned_df and isolated into quarantine_df."""
+    engine = DataCleaningEngine()
+    df = pd.DataFrame(
+        {
+            "tx_id": ["TX-1", "TX-2", None, "TX-4"],
+            "amount": [100.0, -999.0, 50.0, 200.0],
+            "qty": [2, 1, 5, -10],
+        }
+    )
+    quarantine_rules = [
+        {"column": "amount", "min_val": 0, "reason": "negative_amount"},
+        {"column": "qty", "min_val": 1, "reason": "negative_or_zero_qty"},
+        {"column": "tx_id", "not_null": True, "reason": "missing_primary_key"},
+    ]
+    result = engine.clean(df, quarantine_rules=quarantine_rules)
+
+    # Cleaned DataFrame should only contain TX-1 (valid row)
+    assert len(result.cleaned_df) == 1
+    assert result.cleaned_df.iloc[0]["tx_id"] == "TX-1"
+
+    # Quarantine DataFrame should contain the 3 defective rows
+    assert len(result.quarantine_df) == 3
+    assert "_quarantine_reason" in result.quarantine_df.columns
+    assert result.audit.rows_quarantined == 3
+    assert any(s.operation == "quarantine_fatal_defects" for s in result.steps)
+
+
+def test_canonical_synonyms():
+    """Maps dirty string variations to canonical values case-insensitively."""
+    engine = DataCleaningEngine()
+    df = pd.DataFrame(
+        {
+            "channel": ["In-Store", "in store", "ONLINE", "web", "wholesale"],
+        }
+    )
+    synonyms = {
+        "channel": {
+            "in store": "Retail Store",
+            "in-store": "Retail Store",
+            "online": "E-Commerce",
+            "web": "E-Commerce",
+        }
+    }
+    result = engine.clean(df, canonical_synonyms=synonyms)
+    assert result.cleaned_df["channel"].tolist() == [
+        "Retail Store",
+        "Retail Store",
+        "E-Commerce",
+        "E-Commerce",
+        "wholesale",
+    ]
+    assert any(s.operation == "canonical_synonyms" for s in result.steps)
+
+
+def test_formula_recomputations():
+    """Recomputes formula column from arithmetic expression of other columns."""
+    engine = DataCleaningEngine()
+    df = pd.DataFrame(
+        {
+            "unit_price": [10.0, 20.0, 15.0],
+            "quantity": [2, 3, 4],
+            "total_amount": [np.nan, 0.0, 60.0],
+        }
+    )
+    formulas = {
+        "total_amount": "unit_price * quantity"
+    }
+    result = engine.clean(df, formula_recomputations=formulas)
+    assert result.cleaned_df["total_amount"].tolist() == [20.0, 60.0, 60.0]
+    assert any(s.operation == "formula_recomputation" for s in result.steps)
+
+
+def test_resolve_quality_badge():
+    """_resolve_quality_badge produces valid metadata for raw and cleaned datasets."""
+    from backend.app.agent.coordinator import _resolve_quality_badge
+
+    # None dataset returns None
+    assert _resolve_quality_badge(None) is None
+
+    # Netflix raw dataset assessment
+    badge = _resolve_quality_badge("netflix_titles.csv", user_id="user_default")
+    assert badge is not None
+    assert "dataset_name" in badge
+    assert "score" in badge
+    assert "grade" in badge
+    assert "badge_text" in badge
+    assert "is_trustworthy" in badge
+

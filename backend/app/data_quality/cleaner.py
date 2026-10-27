@@ -60,7 +60,11 @@ class DataCleaningEngine:
         normalize_column_names: bool = False,
         casing_rules: Optional[Dict[str, str]] = None,  # col -> 'lower', 'upper', 'title'
         categorical_mappings: Optional[Dict[str, Dict[str, str]]] = None,
+        canonical_synonyms: Optional[Dict[str, Dict[str, str]]] = None,
         date_columns: Optional[List[str]] = None,
+        clean_currency_columns: Optional[List[str]] = None,
+        formula_recomputations: Optional[List[Dict[str, Any]]] = None,
+        quarantine_rules: Optional[Dict[str, Any]] = None,
         range_rules: Optional[Dict[str, Dict[str, Any]]] = None,  # col -> {'min': x, 'max': y, 'action': 'clamp'|'nullify'}
         drop_duplicates_subset: Optional[List[str] | bool] = None,  # True for all cols or list of cols
         missing_strategies: Optional[Dict[str, Dict[str, Any]]] = None,  # col -> {'strategy': '...', 'value': ...}
@@ -72,6 +76,7 @@ class DataCleaningEngine:
 
         steps: List[CleaningStep] = []
         working_df = df.copy()
+        quarantine_df: Optional[pd.DataFrame] = None
 
         # Audit counters
         values_fixed = 0
@@ -138,6 +143,87 @@ class DataCleaningEngine:
                     details=f"Trimmed leading/trailing whitespaces in {total_stripped:,} cells.",
                 )
 
+        # Step 2b: Outlier Quarantine (Separate fatal unrecoverable corruptions)
+        if quarantine_rules:
+            invalid_masks = []
+
+            if isinstance(quarantine_rules, dict):
+                # Non-negative columns
+                non_neg = quarantine_rules.get("non_negative_columns", [])
+                for c in non_neg:
+                    if c in working_df.columns:
+                        num_s = pd.to_numeric(working_df[c], errors="coerce")
+                        neg_m = num_s < 0
+                        if neg_m.any():
+                            invalid_masks.append((neg_m, f"negative_value_in_{c}"))
+
+                # Required columns (cannot be blank/null)
+                req_cols = quarantine_rules.get("required_columns", [])
+                for c in req_cols:
+                    if c in working_df.columns:
+                        bl_m = working_df[c].isna() | working_df[c].astype(str).str.strip().isin(["", "nan", "None"])
+                        if bl_m.any():
+                            invalid_masks.append((bl_m, f"missing_required_{c}"))
+
+                # Invalid date indicators
+                if quarantine_rules.get("invalid_date_check", False):
+                    for c in working_df.columns:
+                        if "date" in c.lower():
+                            dt_inv = working_df[c].astype(str).str.contains("INVALID", case=False, na=False)
+                            if dt_inv.any():
+                                invalid_masks.append((dt_inv, f"invalid_date_in_{c}"))
+
+            elif isinstance(quarantine_rules, list):
+                for rule in quarantine_rules:
+                    if not isinstance(rule, dict):
+                        continue
+                    c = rule.get("column")
+                    reason = rule.get("reason", "FATAL_DEFECT")
+                    if c and c in working_df.columns:
+                        if "min_val" in rule:
+                            num_s = pd.to_numeric(working_df[c], errors="coerce")
+                            m = num_s < rule["min_val"]
+                            if m.any():
+                                invalid_masks.append((m, reason))
+                        if "max_val" in rule:
+                            num_s = pd.to_numeric(working_df[c], errors="coerce")
+                            m = num_s > rule["max_val"]
+                            if m.any():
+                                invalid_masks.append((m, reason))
+                        if rule.get("not_null"):
+                            m = working_df[c].isna() | working_df[c].astype(str).str.strip().isin(["", "nan", "None"])
+                            if m.any():
+                                invalid_masks.append((m, reason))
+                        if rule.get("invalid_date"):
+                            dt_inv = working_df[c].astype(str).str.contains("INVALID", case=False, na=False)
+                            if dt_inv.any():
+                                invalid_masks.append((dt_inv, reason))
+
+            if invalid_masks:
+                combined_m = pd.Series(False, index=working_df.index)
+                reasons_series = pd.Series("", index=working_df.index)
+                for m, r in invalid_masks:
+                    combined_m |= m
+                    # Record the first triggering reason
+                    unassigned = m & (reasons_series == "")
+                    if unassigned.any():
+                        reasons_series.loc[unassigned] = r
+
+                q_count = int(combined_m.sum())
+                if q_count > 0:
+                    quarantined = working_df[combined_m].copy()
+                    quarantined["_quarantine_reason"] = reasons_series[combined_m]
+                    quarantined["_quarantine_rule"] = "quarantine_rules"
+                    quarantine_df = quarantined
+                    working_df = working_df[~combined_m].copy()
+                    record_step(
+                        operation="quarantine_fatal_defects",
+                        target_column=None,
+                        parameters=quarantine_rules if isinstance(quarantine_rules, dict) else {"rules_count": len(quarantine_rules)},
+                        rows_affected=q_count,
+                        details=f"Quarantined {q_count:,} fatal outlier records into quarantine dataset.",
+                    )
+
         # Step 3: Categorical & Casing standardization
         if casing_rules:
             for col, case_type in casing_rules.items():
@@ -180,6 +266,87 @@ class DataCleaningEngine:
                             rows_affected=count,
                             details=f"Mapped {count:,} values in '{col}' to standardized categories.",
                         )
+
+        # Step 3b: Canonical Synonyms Mapping
+        if canonical_synonyms:
+            for col, syn_map in canonical_synonyms.items():
+                if col in working_df.columns:
+                    lower_series = working_df[col].astype(str).str.strip().str.lower()
+                    lookup = {k.lower(): v for k, v in syn_map.items()}
+                    mapped = lower_series.map(lookup)
+                    mask = mapped.notna()
+                    diff = int((working_df[col].astype(str) != mapped).sum())
+                    if diff > 0:
+                        working_df.loc[mask, col] = mapped[mask]
+                        values_fixed += diff
+                        record_step(
+                            operation="canonical_synonyms",
+                            target_column=col,
+                            parameters={"mapping_count": len(syn_map)},
+                            rows_affected=diff,
+                            details=f"Standardized {diff:,} synonyms/aliases in '{col}'.",
+                        )
+
+        # Step 3c: Currency & Numeric String Cleaning
+        CURRENCY_CLEAN_RE = re.compile(r"[₱$€£,]|PHP|USD|EUR", re.IGNORECASE)
+        if clean_currency_columns:
+            for col in clean_currency_columns:
+                if col in working_df.columns:
+                    orig_str = working_df[col].dropna().astype(str)
+                    cleaned_str = orig_str.str.replace(CURRENCY_CLEAN_RE, "", regex=True).str.strip()
+                    num_series = pd.to_numeric(cleaned_str, errors="coerce")
+                    ch_count = int((orig_str != num_series.astype(str)).sum())
+                    working_df[col] = num_series
+                    if ch_count > 0:
+                        values_fixed += ch_count
+                        record_step(
+                            operation="clean_currency",
+                            target_column=col,
+                            parameters={},
+                            rows_affected=ch_count,
+                            details=f"Parsed currency symbols and converted {ch_count:,} values in '{col}' to numeric.",
+                        )
+
+        # Step 3d: Formula Recomputation (e.g. total = unit_price * quantity)
+        if formula_recomputations:
+            specs = []
+            if isinstance(formula_recomputations, dict):
+                for t_col, expr in formula_recomputations.items():
+                    if isinstance(expr, str) and "*" in expr:
+                        parts = [p.strip() for p in expr.split("*")]
+                        specs.append({"target": t_col, "multiply": parts})
+                    elif isinstance(expr, (list, tuple)):
+                        specs.append({"target": t_col, "multiply": list(expr)})
+                    elif isinstance(expr, dict):
+                        specs.append({"target": t_col, **expr})
+            elif isinstance(formula_recomputations, list):
+                specs = formula_recomputations
+
+            for f_spec in specs:
+                if not isinstance(f_spec, dict):
+                    continue
+                target_col = f_spec.get("target")
+                mult_cols = f_spec.get("multiply")
+                if target_col in working_df.columns and mult_cols and len(mult_cols) == 2:
+                    c1, c2 = mult_cols
+                    if c1 in working_df.columns and c2 in working_df.columns:
+                        recomp_m = (
+                            working_df[target_col].isna() | (working_df[target_col] == 0)
+                        ) & working_df[c1].notna() & working_df[c2].notna()
+                        recomp_cnt = int(recomp_m.sum())
+                        if recomp_cnt > 0:
+                            working_df.loc[recomp_m, target_col] = (
+                                pd.to_numeric(working_df.loc[recomp_m, c1], errors="coerce")
+                                * pd.to_numeric(working_df.loc[recomp_m, c2], errors="coerce")
+                            ).round(2)
+                            values_fixed += recomp_cnt
+                            record_step(
+                                operation="formula_recomputation",
+                                target_column=target_col,
+                                parameters=f_spec,
+                                rows_affected=recomp_cnt,
+                                details=f"Recomputed {recomp_cnt:,} missing values in '{target_col}' via {c1} * {c2}.",
+                            )
 
         # Step 4: Date Normalization (Fix D1: accurately distinguish fixed vs coerced nulls)
         if date_columns:
@@ -441,6 +608,7 @@ class DataCleaningEngine:
             values_nullified=values_nullified,
             final_rows=after_stats["total_rows"],
             explanation=explanation,
+            rows_quarantined=len(quarantine_df) if quarantine_df is not None else 0,
         )
 
         return CleaningResult(
@@ -450,6 +618,7 @@ class DataCleaningEngine:
             before_stats=before_stats,
             after_stats=after_stats,
             delta=delta,
+            quarantine_df=quarantine_df,
         )
 
     def _calc_stats(self, df: pd.DataFrame) -> Dict[str, Any]:

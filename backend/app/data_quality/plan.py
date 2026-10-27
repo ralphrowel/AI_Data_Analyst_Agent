@@ -24,6 +24,10 @@ class CleaningPlanRequest(BaseModel):
     drop_duplicates_subset: Optional[Union[List[str], bool]] = Field(None, description="True for all columns, or list of subset columns")
     missing_strategies: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Imputation strategies per column")
     type_conversions: Optional[Dict[str, str]] = Field(None, description="Strict type casting per column ('int', 'float', 'str', 'datetime')")
+    canonical_synonyms: Optional[Dict[str, Dict[str, str]]] = Field(None, description="Canonical synonym and alias mappings")
+    clean_currency_columns: Optional[List[str]] = Field(None, description="Columns to strip currency symbols and cast to numeric")
+    formula_recomputations: Optional[List[Dict[str, Any]]] = Field(None, description="Recompute target column from formulas when NaN")
+    quarantine_rules: Optional[Dict[str, Any]] = Field(None, description="Outlier and fatal defect quarantine rules")
 
     def to_engine_options(self) -> Dict[str, Any]:
         """Converts model to dictionary arguments for DataCleaningEngine.clean()."""
@@ -106,5 +110,15 @@ def generate_suggested_plan(report: QualityReport, df: pd.DataFrame) -> Dict[str
             range_rules[issue.column] = {"action": "clamp"}
     if range_rules:
         plan["range_rules"] = range_rules
+
+    # 6. Currency and numeric strings
+    curr_cols: List[str] = []
+    for col in df.columns:
+        if pd.api.types.is_string_dtype(df[col]) or df[col].dtype == object:
+            sample = df[col].dropna().astype(str).head(100)
+            if sample.str.contains(r"[₱$]|PHP", regex=True).any():
+                curr_cols.append(col)
+    if curr_cols:
+        plan["clean_currency_columns"] = sorted(curr_cols)
 
     return plan

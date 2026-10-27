@@ -19,6 +19,13 @@ export default function SystemMessage({ message }) {
           <div>
             <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1 uppercase tracking-wider">Not answerable</p>
             <p className="text-sm leading-relaxed">{message.text}</p>
+            {message.quality_badge && (
+              <div className="mt-2 pt-1.5 border-t border-amber-200/60 dark:border-amber-800/60 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                <span className="font-medium">Dataset Quality:</span>
+                <span>{message.quality_badge.score}/100 (Grade {message.quality_badge.grade})</span>
+                {message.quality_badge.version_role === "cleaned" && <span className="text-[11px] px-1.5 py-0.2 rounded bg-amber-200/50 dark:bg-amber-800/40 font-semibold">Cleaned</span>}
+              </div>
+            )}
           </div>
         </div>
       </div>

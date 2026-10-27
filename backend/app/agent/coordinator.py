@@ -53,6 +53,43 @@ def _extract_json(raw_text: str) -> dict:
     }
 
 
+def _resolve_quality_badge(dataset_name: Optional[str], user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Deterministically resolves quality badge metadata outside the LLM context."""
+    if not dataset_name:
+        return None
+    try:
+        from backend.app.data_quality.service import default_dq_service
+        assessment = default_dq_service.assess_dataset(dataset_name, user_id=user_id)
+        score_res = assessment.score
+        is_clean_version = "__clean_v" in dataset_name
+
+        if is_clean_version:
+            badge_text = f"Computed on cleaned version ({dataset_name}, Quality Score: {score_res.overall_score:.0f}/100, Grade {score_res.grade})"
+            warning = None
+        else:
+            badge_text = f"Computed on raw dataset ({dataset_name}, Quality Score: {score_res.overall_score:.0f}/100, Grade {score_res.grade})"
+            warning = (
+                f"Warning: Low dataset quality score ({score_res.overall_score:.0f}/100, Grade {score_res.grade}). "
+                f"Detected {assessment.summary.get('duplicate_rows', 0):,} duplicate rows and formatting defects. "
+                f"Consider applying data cleaning."
+                if not score_res.is_trustworthy
+                else None
+            )
+
+        return {
+            "dataset_name": dataset_name,
+            "version_role": "cleaned" if is_clean_version else "raw",
+            "score": round(score_res.overall_score, 1),
+            "grade": score_res.grade,
+            "badge_text": badge_text,
+            "is_trustworthy": score_res.is_trustworthy,
+            "warning": warning,
+        }
+    except Exception as e:
+        logger.debug(f"Could not compute quality badge for {dataset_name}: {e}")
+        return None
+
+
 def _sanitize_chart_data(raw_dict: dict, question: str) -> dict:
     """Sanitize and limit chart data so charts are never clogged or unreadable.
     Filters to user-specified year ranges, sorts chronologically for time series,
@@ -219,11 +256,12 @@ class AgentCoordinator:
                     "This question cannot be answered with the available data.",
                 )
                 model_used = list(models_used)[-1] if models_used else (prov or "gemini")
+                badge = _resolve_quality_badge(getattr(session, "dataset_name", None), user_id=user_id or getattr(session, "user_id", None))
                 self.memory.add_turn(
                     session.session_id,
                     "assistant",
                     reason,
-                    metadata={"operation": "unsupported", "model_used": model_used, "route": route},
+                    metadata={"operation": "unsupported", "model_used": model_used, "route": route, "quality_badge": badge},
                 )
                 self.memory.update_tokens(session.session_id, usage_total, model_used)
                 return {
@@ -235,6 +273,7 @@ class AgentCoordinator:
                     "usage": usage_total,
                     "model_used": model_used,
                     "route": route,
+                    "quality_badge": badge,
                 }
 
             # Step C: Retrieve & execute deterministic tool function
@@ -428,6 +467,7 @@ class AgentCoordinator:
         # UPDATE SESSION & RETURN
         # =====================================================================
         model_used = "groq" if "groq" in models_used else "gemini"
+        badge = _resolve_quality_badge(getattr(session, "dataset_name", None), user_id=user_id or getattr(session, "user_id", None))
         self.memory.update_tokens(session.session_id, usage_total, model_used)
         self.memory.add_turn(
             session.session_id,
@@ -440,6 +480,7 @@ class AgentCoordinator:
                 "chart_base64": chart_base64,
                 "chart_svg": chart_svg,
                 "chart_spec": chart_spec,
+                "quality_badge": badge,
             },
         )
 
@@ -454,6 +495,7 @@ class AgentCoordinator:
             "usage": usage_total,
             "model_used": model_used,
             "route": route,
+            "quality_badge": badge,
         }
 
 

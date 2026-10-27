@@ -370,6 +370,7 @@ class CleaningAuditSummary:
     values_nullified: int
     final_rows: int
     explanation: str
+    rows_quarantined: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -384,6 +385,7 @@ class CleaningAuditSummary:
             values_nullified=data["values_nullified"],
             final_rows=data["final_rows"],
             explanation=data.get("explanation", ""),
+            rows_quarantined=data.get("rows_quarantined", 0),
         )
 
 
