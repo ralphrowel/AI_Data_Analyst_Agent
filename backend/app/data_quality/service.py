@@ -246,12 +246,22 @@ class DataQualityService:
             next_version = 1
 
         target_dataset = f"{base_stem}__clean_v{next_version}{ext}"
+        quarantine_dataset = (
+            f"{base_stem}__quarantine_v{next_version}{ext}"
+            if cleaning_result.quarantine_df is not None and len(cleaning_result.quarantine_df) > 0
+            else None
+        )
 
         # Convert cleaned DataFrame to safe CSV string
         clean_csv_text = to_safe_csv_text(cleaning_result.cleaned_df)
 
         # Persist derived clean CSV via file_store
         file_store.save(owner, target_dataset, clean_csv_text, kind="csv")
+
+        # Persist quarantine CSV if unrecoverable rows were flagged
+        if quarantine_dataset and cleaning_result.quarantine_df is not None:
+            quarantine_csv_text = to_safe_csv_text(cleaning_result.quarantine_df)
+            file_store.save(owner, quarantine_dataset, quarantine_csv_text, kind="csv")
 
         # Build Job record
         job_id = generate_uuid()
@@ -260,6 +270,7 @@ class DataQualityService:
             source_dataset=dataset_name,
             source_fingerprint=source_fingerprint,
             target_dataset=target_dataset,
+            quarantine_dataset=quarantine_dataset,
             user_id=user_id,
             plan=plan,
             steps=cleaning_result.steps,

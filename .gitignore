@@ -139,3 +139,11 @@ data/uploads/
 # ==============================================================================
 Description/
 Data Quality & Cleaning Platform/
+scratch/
+*.pbix
+
+# ==============================================================================
+# Benchmark Artifacts & Execution Cache
+# ==============================================================================
+data/benchmarks/cache/
+benchmarks/results/

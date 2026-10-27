@@ -5,6 +5,8 @@ A full-stack AI agent that answers plain-English questions about a structured da
 Built as a portfolio project to demonstrate full-stack + AI integration skills, inspired by an AWS-based AI data analyst architecture but rebuilt on a fully free stack.
 
 **GitHub:** https://github.com/ralphrowel/AI_Data_Analyst_Agent
+**Precursor Platform:** https://github.com/ralphrowel/Data-Quality-and-Cleaning-Platform
+**Master Roadmap:** [ROADMAP.md](ROADMAP.md)
 
 ---
 
