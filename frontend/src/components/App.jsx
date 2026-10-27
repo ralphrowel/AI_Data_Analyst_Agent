@@ -342,6 +342,7 @@ export default function App() {
               chart_base64: m.chart_base64 || m.metadata?.chart_base64,
               chart_svg: m.chart_svg || m.metadata?.chart_svg,
               chart_spec: m.chart_spec || m.metadata?.chart_spec,
+              quality_badge: m.quality_badge || m.metadata?.quality_badge,
             }));
             setMessages(formatted);
 
@@ -574,6 +575,7 @@ export default function App() {
           chart_base64: data.chart_base64,
           chart_svg: data.chart_svg,
           chart_spec: data.chart_spec,
+          quality_badge: data.quality_badge,
         };
         setMessages((prev) => [...prev, assistantMsg]);
 

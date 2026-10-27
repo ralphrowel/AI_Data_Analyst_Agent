@@ -3,6 +3,52 @@ import ReactMarkdown from "react-markdown";
 import ChartZoomModal from "./ChartZoomModal";
 import InteractiveChart from "./InteractiveChart";
 
+function QualityBadge({ badge }) {
+  if (!badge) return null;
+  const isTrustworthy = badge.is_trustworthy;
+  const isCleaned = badge.version_role === "cleaned";
+
+  return (
+    <div className="mb-2.5">
+      <div
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shadow-2xs transition-colors ${
+          isTrustworthy
+            ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60"
+            : "bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800/70"
+        }`}
+        title={badge.badge_text}
+      >
+        {isTrustworthy ? (
+          <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+          </svg>
+        ) : (
+          <svg className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        )}
+        <span>
+          {isCleaned ? "Cleaned Version" : isTrustworthy ? "Verified Clean" : "Raw Data Notice"}
+          {" • "}
+          <strong className="font-semibold">Score: {badge.score}/100 ({badge.grade})</strong>
+        </span>
+      </div>
+
+      {!isTrustworthy && badge.warning && (
+        <div className="mt-1.5 p-2.5 rounded-lg bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11.5px] leading-relaxed text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-1 font-semibold mb-0.5 text-amber-950 dark:text-amber-100">
+            <svg className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <span>Data Quality Warning</span>
+          </div>
+          <p>{badge.warning}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MessageBubble({ message, onPinToDashboard }) {
   const [copied, setCopied] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
@@ -50,6 +96,7 @@ export default function MessageBubble({ message, onPinToDashboard }) {
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
         ) : (
           <div className="text-sm leading-relaxed space-y-2">
+            {message.quality_badge && <QualityBadge badge={message.quality_badge} />}
             <ReactMarkdown
               components={{
                 h1: ({ node, ...props }) => (
