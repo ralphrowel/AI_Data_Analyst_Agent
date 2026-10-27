@@ -1,0 +1,522 @@
+[
+  {
+    "id": "agg_01_total_revenue",
+    "category": "aggregation",
+    "question": "What is the total sales amount in PHP across all transactions?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 27901267.2,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "duplicates_and_currency_strings"
+  },
+  {
+    "id": "agg_02_transaction_count",
+    "category": "aggregation",
+    "question": "How many total transactions are recorded in the dataset?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 5000,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "duplicates_and_quarantine_rows"
+  },
+  {
+    "id": "agg_03_total_quantity",
+    "category": "aggregation",
+    "question": "What is the total quantity of all items sold?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 22397,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "duplicates_and_fatal_outliers"
+  },
+  {
+    "id": "agg_04_average_order_value",
+    "category": "aggregation",
+    "question": "What is the average transaction total amount in PHP?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 5580.25,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "currency_strings_and_fatal_outliers"
+  },
+  {
+    "id": "agg_05_average_unit_price",
+    "category": "aggregation",
+    "question": "What is the average unit price across all products sold?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 1232.53,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "currency_strings_and_negative_prices"
+  },
+  {
+    "id": "agg_06_max_unit_price",
+    "category": "aggregation",
+    "question": "What is the maximum unit price of any item sold in the dataset?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 6817.44,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "currency_strings"
+  },
+  {
+    "id": "agg_07_min_unit_price",
+    "category": "aggregation",
+    "question": "What is the minimum unit price of any item sold in the dataset?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 85.56,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "negative_outlier_prices"
+  },
+  {
+    "id": "agg_08_average_quantity",
+    "category": "aggregation",
+    "question": "What is the average quantity of items purchased per transaction?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 4.48,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "negative_quantities_and_duplicates"
+  },
+  {
+    "id": "agg_09_total_gcash_revenue",
+    "category": "aggregation",
+    "question": "What is the total sales amount in PHP for payments made via GCash?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 12589020.28,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "payment_method_lowercase_and_currency_strings"
+  },
+  {
+    "id": "agg_10_total_maya_revenue",
+    "category": "aggregation",
+    "question": "What is the total sales amount in PHP for transactions paid using Maya?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 5115926.09,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "payment_method_casing_and_currency_strings"
+  },
+  {
+    "id": "agg_11_total_cash_revenue",
+    "category": "aggregation",
+    "question": "What is the total sales amount in PHP for cash transactions?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 6241105.59,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "payment_method_casing_and_currency_strings"
+  },
+  {
+    "id": "agg_12_total_credit_card_revenue",
+    "category": "aggregation",
+    "question": "What is the total sales amount in PHP for credit card transactions?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 3955215.24,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "payment_method_casing_and_currency_strings"
+  },
+  {
+    "id": "agg_13_max_transaction_total",
+    "category": "aggregation",
+    "question": "What is the highest single transaction total amount in PHP?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 54231.52,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "currency_strings"
+  },
+  {
+    "id": "agg_14_min_transaction_total",
+    "category": "aggregation",
+    "question": "What is the lowest valid single transaction total amount in PHP?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 86.76,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "negative_amount_fatal_outliers"
+  },
+  {
+    "id": "agg_15_total_electronics_revenue",
+    "category": "aggregation",
+    "question": "What is the total sales amount in PHP for the Electronics category?",
+    "target_tool": "aggregate_data",
+    "ground_truth_value": 15896079.38,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_whitespace_and_currency_strings"
+  },
+  {
+    "id": "filt_01_ncr_transaction_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions were completed in the NCR region?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1243,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_and_casing"
+  },
+  {
+    "id": "filt_02_ncr_total_revenue",
+    "category": "filtered_lookup",
+    "question": "What is the total sales amount in PHP for the NCR region?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 6371196.54,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_and_currency_strings"
+  },
+  {
+    "id": "filt_03_region_vii_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions occurred in Region VII?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1180,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_central_visayas"
+  },
+  {
+    "id": "filt_04_region_vii_revenue",
+    "category": "filtered_lookup",
+    "question": "What is the total revenue in PHP generated in Region VII?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 6809283.76,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_and_currency_strings"
+  },
+  {
+    "id": "filt_05_region_iv_a_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions were recorded in Region IV-A?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1276,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_calabarzon"
+  },
+  {
+    "id": "filt_06_region_xi_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions were recorded in Region XI?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1301,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_davao_region"
+  },
+  {
+    "id": "filt_07_sm_megamall_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions occurred at the SM Megamall store branch?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 316,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "store_name_whitespace"
+  },
+  {
+    "id": "filt_08_sm_megamall_revenue",
+    "category": "filtered_lookup",
+    "question": "What is the total sales revenue in PHP at SM Megamall?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1441059.83,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "store_whitespace_and_currency_strings"
+  },
+  {
+    "id": "filt_09_ayala_center_cebu_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions were logged at Ayala Center Cebu?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 369,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "store_branch_drift"
+  },
+  {
+    "id": "filt_10_apparel_transaction_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions belong to the Apparel category?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1200,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_casing_and_whitespace"
+  },
+  {
+    "id": "filt_11_groceries_transaction_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions belong to the Groceries category?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1304,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_casing_and_whitespace"
+  },
+  {
+    "id": "filt_12_health_beauty_count",
+    "category": "filtered_lookup",
+    "question": "How many transactions are in the Health & Beauty category?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 1280,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_whitespace_and_ampersand"
+  },
+  {
+    "id": "filt_13_high_value_transactions",
+    "category": "filtered_lookup",
+    "question": "How many transactions have a total amount greater than 20000 PHP?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 336,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "currency_strings_preventing_gt_filter"
+  },
+  {
+    "id": "filt_14_single_item_orders",
+    "category": "filtered_lookup",
+    "question": "How many transactions had a quantity of exactly 1 item?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 629,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "duplicates_and_fatal_outliers"
+  },
+  {
+    "id": "filt_15_bulk_orders",
+    "category": "filtered_lookup",
+    "question": "How many transactions had a quantity of 5 or more items?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 2490,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "duplicates_and_negative_quantities"
+  },
+  {
+    "id": "grp_01_top_category_by_revenue",
+    "category": "group_distribution",
+    "question": "Which product category generated the highest total sales revenue?",
+    "target_tool": "group_data",
+    "ground_truth_value": "Electronics",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_fragmentation_and_currency_strings"
+  },
+  {
+    "id": "grp_02_top_region_by_revenue",
+    "category": "group_distribution",
+    "question": "Which region generated the highest total sales amount in PHP?",
+    "target_tool": "group_data",
+    "ground_truth_value": "Region IV-A",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_fragmentation"
+  },
+  {
+    "id": "grp_03_most_frequent_payment_method",
+    "category": "group_distribution",
+    "question": "What is the most frequently used payment method by transaction count?",
+    "target_tool": "group_data",
+    "ground_truth_value": "GCash",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "payment_method_lowercase_fragmentation"
+  },
+  {
+    "id": "grp_04_top_store_by_revenue",
+    "category": "group_distribution",
+    "question": "Which store branch generated the highest total revenue in PHP?",
+    "target_tool": "group_data",
+    "ground_truth_value": "SM City Dasmari\u00f1as",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "store_name_whitespace_fragmentation"
+  },
+  {
+    "id": "grp_05_apparel_total_revenue",
+    "category": "group_distribution",
+    "question": "What is the total sales amount in PHP for Apparel?",
+    "target_tool": "group_data",
+    "ground_truth_value": 8015648.78,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_casing_and_currency_strings"
+  },
+  {
+    "id": "grp_06_groceries_total_revenue",
+    "category": "group_distribution",
+    "question": "What is the total sales amount in PHP for Groceries?",
+    "target_tool": "group_data",
+    "ground_truth_value": 1460448.85,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_casing_and_currency_strings"
+  },
+  {
+    "id": "grp_07_health_beauty_total_revenue",
+    "category": "group_distribution",
+    "question": "What is the total sales amount in PHP for Health & Beauty?",
+    "target_tool": "group_data",
+    "ground_truth_value": 2529090.19,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_whitespace_and_currency_strings"
+  },
+  {
+    "id": "grp_08_region_iv_a_total_revenue",
+    "category": "group_distribution",
+    "question": "What is the total sales revenue in PHP for Region IV-A?",
+    "target_tool": "group_data",
+    "ground_truth_value": 7469158.85,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_calabarzon"
+  },
+  {
+    "id": "grp_09_region_xi_total_revenue",
+    "category": "group_distribution",
+    "question": "What is the total sales revenue in PHP for Region XI?",
+    "target_tool": "group_data",
+    "ground_truth_value": 7251628.05,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_davao_region"
+  },
+  {
+    "id": "grp_10_least_frequent_payment_method",
+    "category": "group_distribution",
+    "question": "What is the least common payment method by transaction count?",
+    "target_tool": "group_data",
+    "ground_truth_value": "Credit Card",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "payment_method_casing_fragmentation"
+  },
+  {
+    "id": "grp_11_lowest_revenue_category",
+    "category": "group_distribution",
+    "question": "Which product category generated the lowest total sales amount?",
+    "target_tool": "group_data",
+    "ground_truth_value": "Groceries",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "category_casing_fragmentation"
+  },
+  {
+    "id": "grp_12_lowest_revenue_region",
+    "category": "group_distribution",
+    "question": "Which region had the lowest total sales revenue in PHP?",
+    "target_tool": "group_data",
+    "ground_truth_value": "NCR",
+    "result_type": "string",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "regional_alias_fragmentation"
+  },
+  {
+    "id": "temp_01_q1_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP for Q1 2024 (January to March)?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 6953300.86,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_02_q2_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP for Q2 2024 (April to June)?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 6763651.77,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_03_q3_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP for Q3 2024 (July to September)?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 6516205.93,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_04_q4_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP for Q4 2024 (October to December)?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 7668108.64,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_05_december_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP in the month of December 2024?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 2929757.18,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_06_december_transactions",
+    "category": "temporal_trend",
+    "question": "How many transactions were recorded in December 2024?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 484,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_and_duplicates"
+  },
+  {
+    "id": "temp_07_january_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP in the month of January 2024?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 2350221.37,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_08_first_half_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP for the first half of 2024 (H1)?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 13716952.63,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_09_second_half_revenue",
+    "category": "temporal_trend",
+    "question": "What is the total sales amount in PHP for the second half of 2024 (H2)?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 14184314.57,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_inconsistency"
+  },
+  {
+    "id": "temp_10_first_half_transactions",
+    "category": "temporal_trend",
+    "question": "How many total transactions were completed during the first half of 2024?",
+    "target_tool": "filter_rows",
+    "ground_truth_value": 2470,
+    "result_type": "number",
+    "tolerance_pct": 0.001,
+    "error_vulnerability": "date_formatting_and_duplicates"
+  }
+]
