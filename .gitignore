@@ -147,4 +147,5 @@ scratch/
 # ==============================================================================
 data/benchmarks/cache/
 data/benchmarks/ablated_*.csv
+data/benchmarks/held_out_cleaned.csv
 benchmarks/results/

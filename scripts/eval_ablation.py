@@ -151,18 +151,24 @@ def prepare_ablated_dataset(
                         "manila": "NCR",
                         "ncr": "NCR",
                         "central visayas": "Region VII",
+                        "region vii": "Region VII",
                         "calabarzon": "Region IV-A",
+                        "region iv-a": "Region IV-A",
                         "davao region": "Region XI",
+                        "region xi": "Region XI",
                     }
                     df[col] = df[col].apply(lambda x: alias_map.get(x.lower(), x))
                 # Title casing for payment methods and categories
                 if col == "payment_method":
                     pm_map = {"gcash": "GCash", "maya": "Maya", "cash": "Cash", "credit card": "Credit Card"}
                     df[col] = df[col].apply(lambda x: pm_map.get(x.lower(), x.title()))
+                if col == "category":
+                    cat_map = {"electronics": "Electronics", "groceries": "Groceries", "apparel": "Apparel", "health & beauty": "Health & Beauty"}
+                    df[col] = df[col].apply(lambda x: cat_map.get(x.lower(), x.title()))
 
-    # 4. Date normalization
+    # 4. Date normalization (uses mixed format to parse DD/MM/YYYY, ISO, timestamps without losing rows)
     if plan.get("handle_dates", True) and "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+        df["date"] = pd.to_datetime(df["date"], errors="coerce", format="mixed").dt.strftime("%Y-%m-%d")
 
     # 5. Currency & numeric parsing
     for col in ["total_amount_php", "unit_price_php"]:
@@ -173,7 +179,7 @@ def prepare_ablated_dataset(
     # If total_amount_php is NaN, recompute from unit_price * quantity
     if "total_amount_php" in df.columns and "unit_price_php" in df.columns and "quantity" in df.columns:
         recompute_mask = df["total_amount_php"].isna() & df["unit_price_php"].notna() & df["quantity"].notna()
-        df.loc[recompute_mask, "total_amount_php"] = df.loc[recompute_mask, "unit_price_php"] * df.loc[recompute_mask, "quantity"]
+        df.loc[recompute_mask, "total_amount_php"] = (df.loc[recompute_mask, "unit_price_php"] * df.loc[recompute_mask, "quantity"]).round(2)
 
     df.to_csv(out_path, index=False, encoding="utf-8")
     return out_path
