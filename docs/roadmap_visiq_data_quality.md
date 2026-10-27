@@ -191,22 +191,40 @@ graph TD
 
 ---
 
-## 3. Sprint 1 & Sprint 2 Actionable Checklists
+## 3. Sprint Progress & Actionable Checklists
 
-### Sprint 1 Checklist: Hygiene & Foundation
-- [ ] **1.1.1:** Push uncommitted `.pbix` to standalone remote `https://github.com/ralphrowel/Data-Quality-and-Cleaning-Platform`.
-- [ ] **1.1.2:** Untrack and delete local `Data Quality & Cleaning Platform` folder from the parent repository (`git rm --cached`).
-- [ ] **1.1.3:** Untrack committed temporary test files: `git rm -r --cached pytest_tmp scratch`.
-- [ ] **1.1.4:** Update `.gitignore` with `pytest_tmp/`, `scratch/`, `*.pbix`, `data/benchmarks/cache/`, and `benchmarks/results/`.
-- [ ] **1.1.5:** Reference standalone predecessor repository in `README.md`.
-- [ ] **1.1.6:** Standardize version and quarantine output file paths in `backend/app/data_quality/service.py`.
-- [ ] **1.1.7:** Run `pytest` to verify all 124 existing unit tests pass cleanly.
+### Sprint 1 Checklist: Hygiene & Foundation (Status: Merged via PR #1)
+- [x] **1.1.1:** Verified standalone remote backup at `https://github.com/ralphrowel/Data-Quality-and-Cleaning-Platform`.
+- [x] **1.1.2:** Untracked and removed local `Data Quality & Cleaning Platform` folder from the parent repository (`git rm --cached`).
+- [x] **1.1.3:** Untracked committed temporary test files: `git rm -r --cached pytest_tmp scratch`.
+- [x] **1.1.4:** Updated `.gitignore` with `pytest_tmp/`, `scratch/`, `*.pbix`, `data/benchmarks/cache/`, and `benchmarks/results/`.
+- [x] **1.1.5:** Referenced standalone predecessor repository in `README.md`.
+- [x] **1.1.6:** Standardized version and quarantine output file paths in `backend/app/data_quality/service.py` (`__clean_v{n}.csv`, `__quarantine_v{n}.csv`).
+- [x] **1.1.7:** Verified all 124 existing unit tests pass cleanly.
 
-### Sprint 2 Checklist: Datasets & Benchmark Harness
-- [ ] **2.1.1:** Write `scripts/generate_philippine_retail.py` with fixed random seed (5,000 clean baseline rows).
-- [ ] **2.1.2:** Inject additive noise (+400 duplicates, +100 fatal quarantine rows) and in-place mutations (currency strings, casing, unambiguous dates).
-- [ ] **2.1.3:** Write `scripts/generate_held_out_dataset.py` with independent noise distributions (`₱1.2k`, European decimal commas).
-- [ ] **2.1.4:** Write `scripts/generate_questions.py` computing 52 exact ground-truth answers via Pandas on the clean file.
-- [ ] **2.1.5:** Build `scripts/eval_runner.py` with local response caching and deterministic outcome scoring ($\pm 0.1\%$ tolerance).
-- [ ] **2.1.6:** Build `scripts/eval_ablation.py` supporting leave-one-out and single-cleaner evaluations.
-- [ ] **2.1.7:** Run baseline benchmark on raw dataset to establish initial uncleaned accuracy and crash rate.
+### Sprint 2 Checklist: Datasets & Benchmark Harness (Status: Merged via PR #2)
+- [x] **2.1.1:** Authored `scripts/generate_philippine_retail.py` with fixed random seed (5,000 clean baseline rows, Ground Truth Revenue: PHP 27,901,267.20).
+- [x] **2.1.2:** Injected additive noise (+400 duplicates, +100 fatal quarantine rows) and in-place mutations (currency strings, casing, unambiguous dates) into `data/benchmarks/dirty_retail_injected.csv`.
+- [x] **2.1.3:** Authored `scripts/generate_held_out_dataset.py` with independent noise distributions (`₱1.2k`, European decimal commas) for generalization testing.
+- [x] **2.1.4:** Authored `scripts/generate_questions.py` computing 52 exact ground-truth answers via Pandas in `data/benchmarks/questions_benchmark.json`.
+- [x] **2.1.5:** Built `scripts/eval_runner.py` with SHA-256 plan caching and deterministic outcome scoring ($\pm 0.1\%$ relative tolerance).
+- [x] **2.1.6:** Built `scripts/eval_ablation.py` supporting leave-one-out and single-cleaner evaluations across 6 configurations.
+- [x] **2.1.7:** Validated initial smoke test: Clean Accuracy 100.0% (3/3), Raw Dirty Accuracy 0.0% (0/3), Cleaned Accuracy 100.0% (3/3).
+
+### Sprint 3 Checklist: Gap-Filling Cleaners & Proactive Quality Badge (Status: Complete, PR Open)
+- [x] **3.1.1:** Enhanced `backend/app/data_quality/cleaner.py` with fatal defect quarantine routing (`quarantine_df`), regex currency parsing, case-insensitive canonical synonyms, and formula recomputations.
+- [x] **3.1.2:** Enhanced `backend/app/data_quality/plan.py` with currency column detection and updated `CleaningPlanRequest`.
+- [x] **3.1.3:** Implemented deterministic `_resolve_quality_badge()` in `backend/app/agent/coordinator.py` outside the LLM context to prevent prompt contamination.
+- [x] **3.1.4:** Updated API schemas (`AnalysisResponse.quality_badge`) and `/api/ask` route to return quality metadata.
+- [x] **3.1.5:** Enhanced frontend `frontend/src/components/MessageBubble.jsx` and `SystemMessage.jsx` to render proactive quality badges (verified clean vs low-quality raw data warning).
+- [x] **3.1.6:** Added comprehensive unit tests in `tests/test_dq_cleaner.py` (all 129 tests passing).
+- [x] **3.1.7:** Verified Vite production frontend build completes without errors.
+
+### Sprint 4 Checklist: Full Benchmark & Ablation Study Execution (Status: In Progress)
+- [ ] **4.1.1:** Run `eval_runner.py` across all 52 benchmark questions on the clean ground truth dataset.
+- [ ] **4.1.2:** Run `eval_runner.py` across all 52 benchmark questions on the raw dirty dataset.
+- [ ] **4.1.3:** Run `eval_runner.py` across all 52 benchmark questions on the fully cleaned dataset.
+- [ ] **4.1.4:** Execute the full 6-configuration ablation study via `scripts/eval_ablation.py` and output `benchmarks/results/ablation_summary.csv`.
+- [ ] **4.1.5:** Evaluate generalization on the held-out dirty dataset (`data/benchmarks/held_out_messy.csv`).
+- [ ] **4.1.6:** Author executive evaluation report documenting cross-model accuracy, crash rates, and per-cleaner impact.
+
