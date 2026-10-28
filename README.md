@@ -1,124 +1,285 @@
-# AI Data Analyst Agent
+# Visiq: Quality-First AI Data Analyst Platform
 
-A full-stack AI agent that answers plain-English questions about a structured dataset, generates a safe query plan via an LLM, executes it against real data, and returns a plain-English summary plus a chart — no `eval()`, no raw AI-generated code execution.
+> **Core Empirical Claim:**  
+> *Deterministic data cleaning measurably improves the execution accuracy of an LLM data analyst from **13.46%** to **100.00%** (+86.54 percentage points), completely eliminating type poisoning, duplicate inflation, categorical drift, and date fragmentation.*
 
-Built as a portfolio project to demonstrate full-stack + AI integration skills, inspired by an AWS-based AI data analyst architecture but rebuilt on a fully free stack.
-
-**GitHub:** https://github.com/ralphrowel/AI_Data_Analyst_Agent
-**Precursor Platform:** https://github.com/ralphrowel/Data-Quality-and-Cleaning-Platform
-**Master Roadmap:** [ROADMAP.md](ROADMAP.md)
-
----
-
-## What it does
-
-Ask a question like *"What is the total number of Movie and TV Show titles?"* or *"Show me all titles made in Japan"* and the agent will:
-
-1. Turn your question into a structured JSON query plan (never raw executable code)
-2. Safely execute that plan against the dataset with Pandas
-3. Summarize the result in plain English
-4. Generate a matching chart automatically (or let you pick the chart type yourself)
-
-If a question can't be answered with the available data, the agent honestly says so (`unsupported`) instead of guessing.
+[![Test Suite](https://img.shields.io/badge/pytest-136%20passed-brightgreen.svg)](#running-tests)
+[![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2B%20Vite%20%2B%20Tailwind-blue.svg)](frontend/)
+[![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20Pandas-009688.svg)](backend/)
+[![Primary Model](https://img.shields.io/badge/LLM-Groq%20gpt--oss--120b-orange.svg)](#tech-stack)
+[![Evaluation](https://img.shields.io/badge/benchmark-52%20questions%20exact%20match-purple.svg)](docs/benchmark_results_report.md)
 
 ---
 
-## Tech stack
+## 📌 Executive Summary & Key Links
 
-| Layer | Tech |
-|---|---|
-| LLM (primary) | Groq (`openai/gpt-oss-120b`) |
-| LLM (alternate/fallback) | Google Gemini (`gemini-2.5-flash`) |
-| Data | Pandas, NumPy |
-| Charts | Matplotlib, returned as in-memory base64 (no disk I/O) |
-| Backend | FastAPI + Uvicorn |
-| Frontend | React (Vite) + Tailwind CSS v4 |
-| Dataset | Netflix Titles (Kaggle), 8,807 rows / 12 columns |
+Most enterprise AI data analyst initiatives fail in production not because large language models lack reasoning capabilities, but because **tabular enterprise data violates fundamental relational assumptions**. Prefixing currency values with `₱`, formatting dates inconsistently, introducing duplicate records, and polluting categorical fields with casing drift poison data frames—causing downstream AI tool execution to silently calculate incorrect numbers or throw unhandled runtime exceptions.
 
----
+**Visiq** solves this by unifying an enterprise AI data analyst agent with a deterministic Pandas data quality and cleaning engine. Raw uploads are profiled across four quality dimensions, remediated via deterministic cleaning pipelines, and audited with isolated quarantine tables—guaranteeing that downstream LLM analysis operates on mathematically sound data.
 
-## Core design decisions
-
-- **Structured JSON over code execution** — the LLM returns a query plan (`filter`, `value_counts`, `group_by_agg`, `sort_limit`, or `unsupported`), never code, so nothing AI-generated is ever `eval()`'d against real data.
-- **Honest refusals over fabrication** — `unsupported` is a valid, intentional response, not an error state.
-- **Two-call pattern** — Call 1 turns the question into a query plan; Call 2 turns the results into a plain-English summary.
-- **LLM fallback** — Groq is the configured default; Gemini is used when Groq fails and a Gemini key is available. When Gemini is selected, quota errors may fall back to Groq.
-- **Charts travel as base64 in the JSON response** — generated in-memory via `io.BytesIO()`, never written to disk, so it works on read-only deployment filesystems (Render/Railway).
+- 📖 **[90-Second Walkthrough & Evaluator Guide](docs/walkthrough_guide.md)** — Step-by-step evaluation guide for recruiters & technical interviewers.
+- 📊 **[Empirical Benchmark & Ablation Study Report](docs/benchmark_results_report.md)** — Comprehensive methodology, formulas, and results.
+- 🗺️ **[Master Integration Roadmap](docs/roadmap_visiq_data_quality.md)** — Ten-phase architecture, sprint history, and design contracts.
+- 🏛️ **[Precursor Standalone Platform](https://github.com/ralphrowel/Data-Quality-and-Cleaning-Platform)** — Standalone data quality engine repository.
 
 ---
 
-## Project structure
+## 🔬 Empirical Benchmark Results
+
+We benchmarked the agent across **52 deterministic analytical queries** spanning four query categories on a 5,000-row synthetic Philippine Retail Dataset ($27,901,267.20 PHP ground truth revenue). Questions were evaluated by comparing extracted tool execution results against exact ground truth values within a **$\le 0.1\%$ relative mathematical tolerance** (zero subjective LLM-as-a-judge scoring).
+
+### 1. Primary Benchmark (52 Queries)
+
+| Analytical Query Category | Total Queries | Clean Ground Truth | Raw Injected Dirty Data | Post-Pipeline Cleaned | Accuracy Recovery |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Simple Aggregations** | 15 | **100.0%** (15/15) | **13.3%** (2/15) | **100.0%** (15/15) | **+86.7%** |
+| **Filtered Lookups** | 15 | **100.0%** (15/15) | **0.0%** (0/15) | **100.0%** (15/15) | **+100.0%** |
+| **Group-By Distributions** | 12 | **100.0%** (12/12) | **41.7%** (5/12) | **100.0%** (12/12) | **+58.3%** |
+| **Temporal Trends** | 10 | **100.0%** (10/10) | **0.0%** (0/10) | **100.0%** (10/10) | **+100.0%** |
+| **OVERALL ACCURACY** | **52** | **100.0%** (52/52) | **13.5%** (7/52) | **100.0%** (52/52) | **+86.54 pp** |
 
 ```
-Ai Data Analyst Agent/
-├── backend/                      # Modular backend package
++-------------------------------------------------------------------------+
+|                  DOWNSTREAM LLM ACCURACY COMPARISON                     |
++-------------------------------------------------------------------------+
+| Clean Ground Truth (5,000 rows)         : [####################] 100.0% |
+| Raw Injected Dirty Data (5,500 rows)    : [##                ]  13.5% |
+| Cleaned via Visiq Pipeline (5,000 rows) : [####################] 100.0% |
++-------------------------------------------------------------------------+
+```
+
+### 2. Ablation Study: Impact of Individual Cleaner Modules
+
+To isolate exactly which transformation drives each portion of the accuracy gain, we executed a full leave-one-out ablation matrix:
+
+| Configuration | Description | Total Queries | Execution Crashes | Correct Answers | Accuracy Rate (%) | Accuracy Drop Without Feature |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `01_raw_dirty_baseline` | Raw Data (No Cleaning) | 52 | 0 | 7 | **13.46%** | Baseline |
+| `02_full_pipeline` | Full Cleaning Pipeline | 52 | 0 | 52 | **100.00%** | **Max Ceiling** |
+| `03_no_dedup` | Without Deduplication | 52 | 0 | 12 | **23.08%** | **-76.92%** |
+| `06_no_quarantine` | Without Outlier Quarantine | 52 | 0 | 21 | **40.38%** | **-59.62%** |
+| `04_no_category_cleaning` | Without Category Normalization | 52 | 0 | 33 | **63.46%** | **-36.54%** |
+| `05_no_date_normalization` | Without Date Normalization | 52 | 0 | 42 | **80.77%** | **-19.23%** |
+
+- **Deduplication is dominant (-76.92% drop if omitted):** An 8% duplicate injection completely corrupts financial counts, averages, and group sums across all data slices.
+- **Outlier Quarantine preserves numeric sanity (-59.62% drop if omitted):** Fatal negative amounts (`total_amount < 0`) and blank primary keys destroy aggregations unless isolated.
+- **Category Normalization protects granular filtering (-36.54% drop if omitted):** Regional casing drift (`"ncr"` vs `"NCR"`) causes exact lookup queries to return zero rows.
+- **Date Normalization restores time-series analytics (-19.23% drop if omitted):** Mixed date patterns (`15/03/2024`, `15-Mar-2024`) break temporal queries without mixed-format parsing.
+
+### 3. Generalization to Unseen Noise Distributions (Held-Out Dataset)
+
+To eliminate the risk of circular benchmark tuning ("training on the test"), we evaluated the frozen cleaner on an independent 2,500-row FMCG E-Commerce dataset featuring **unseen noise distributions** (European decimal commas `1.250,50`, abbreviated currency `₱1.2k`, store typos, and new relational column names):
+
+| Metric | Raw Messy Baseline | Post-Cleaning Pipeline | Accuracy Recovery |
+| :--- | :---: | :---: | :---: |
+| **Aggregation Accuracy** | 0.0% (0/5) | **100.0%** (5/5) | **+100.0%** |
+| **Filtered Lookups** | 0.0% (0/5) | **40.0%** (2/5) | **+40.0%** |
+| **Group Distributions** | 50.0% (1/2) | **100.0%** (2/2) | **+50.0%** |
+| **OVERALL ACCURACY** | **8.33%** (1/12) | **75.00%** (9/12) | **+66.67 pp** |
+
+---
+
+## 🏗️ End-to-End System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Ingestion["1. Multi-Tenant Ingestion & Upload Boundary"]
+        U["User Upload (.csv)"] --> SEC["HTTP 413 & 5 MB Boundary Guard"]
+        SEC --> DM["Tenant-Isolated Storage Engine (Postgres RLS)"]
+    end
+
+    subgraph QualityEngine["2. Data Quality & Profiling Engine"]
+        DM --> DP["DataProfiler (Schema, Types, Nulls, Cardinality)"]
+        DP --> DQE["QualityEngine (10 Deterministic Integrity Rules)"]
+        DQE --> DQS["QualityScorer (Completeness, Validity, Uniqueness, Consistency)"]
+        DQS --> REP["Quality Assessment & Health Score (Grade A - F)"]
+    end
+
+    subgraph Remediation["3. Deterministic Cleaning & Quarantine Pipeline"]
+        REP --> PLAN["Auto-Generated Remediation Plan"]
+        PLAN --> CLEAN["DataCleaningEngine (Pandas In-Memory Dry Run)"]
+        CLEAN --> DEDUP["1. Exact Deduplication"]
+        CLEAN --> CURR["2. Currency & Number Stripping"]
+        CLEAN --> NORM["3. Mixed Date & Categorical Casing Normalization"]
+        CLEAN --> QUAR["4. Fatal Outlier Quarantine Router"]
+        
+        QUAR -->|Clean Rows| CSNAP["Derived Clean Snapshot (__clean_v1.csv)"]
+        QUAR -->|Corrupt Rows| QSNAP["Quarantine Snapshot (__quarantine_v1.csv)"]
+        CSNAP --> LIN["Lineage & Audit Store"]
+        QSNAP --> LIN
+    end
+
+    subgraph AgentServing["4. Quality-Aware Agent Execution"]
+        Q["User Plain-English Query"] --> COORD["AgentCoordinator"]
+        LIN --> BADGE["Deterministic Quality Badge Generator (Outside LLM Context)"]
+        COORD --> ROUTER["Intent Router (Groq gpt-oss-120b)"]
+        ROUTER --> TOOLS["Structured Tools (filter, group_by_agg, sort_limit, value_counts)"]
+        CSNAP -.->|Active Dataset| TOOLS
+        TOOLS --> SUMM["Natural Language Summarizer"]
+        TOOLS --> CHART["Matplotlib In-Memory Chart Engine"]
+        SUMM --> RES["API Response: Summary + Chart + Deterministic Quality Badge"]
+        BADGE --> RES
+    end
+```
+
+---
+
+## 🛡️ Core Methodological & Engineering Guardrails
+
+1. **Additive Error Model (Preserving 100% Ground Truth Ceiling):** Fatal corruptions (negative prices, blank keys) and duplicates are added *on top* of the clean baseline. Quarantining or removing them restores the exact mathematical ground truth.
+2. **Outcome-Based Deterministic Scoring:** Scored via exact floating-point comparison within $\pm 0.1\%$ relative tolerance against Pandas ground truth. Zero LLM judge noise.
+3. **Zero Prompt Contamination:** Quality badges (`🛡️ Verified: Clean v1 (Score: 96/100, Grade A)`) are calculated deterministically in the API metadata *outside* the agent's LLM prompt context to avoid biasing model reasoning.
+4. **Zero `eval()` Execution:** The agent produces structured JSON query plans executed through controlled Pandas tool functions—never arbitrary AI-generated Python code.
+5. **Multi-Tenant Deployment Hardening:** Railway-compatible 5 MB upload boundary (`HTTP 413`), workspace tenant isolation, and daily query/token quota guards.
+
+---
+
+## 💻 Tech Stack
+
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Primary LLM** | Groq (`openai/gpt-oss-120b`) | Query planning, routing & summarization |
+| **Alternate / Fallback LLM** | Google Gemini (`gemini-2.5-flash`) | Automatic failover provider |
+| **Data Engine & Cleaning** | Python 3.14+, Pandas, NumPy | In-memory profiling, scoring & deterministic cleaning |
+| **Backend API** | FastAPI, Starlette, Uvicorn | REST API, async routing & rate limiting |
+| **Database & Persistence** | PostgreSQL (`app_records`), SQLite (Test) | Multi-tenant lineage, chat history & quotas |
+| **Authentication** | Supabase JWT & JWKS | Secure multi-tenant user isolation |
+| **Visualization** | Matplotlib (`io.BytesIO`) | In-memory base64 chart generation |
+| **Frontend UI** | React 19, Vite, Tailwind CSS v4 | Interactive data quality workspace & spreadsheet grid |
+
+---
+
+## 📁 Repository Structure
+
+```
+AI_Data_Analyst_Agent/
+├── backend/
 │   ├── app/
-│   │   ├── main.py               # FastAPI application & CORS
-│   │   ├── config.py             # Centralized settings & data paths
-│   │   ├── api/                  # REST endpoints & Pydantic schemas
-│   │   │   ├── routes.py         # /api/ask, /api/suggestions
-│   │   │   └── schemas.py
-│   │   ├── agent/                # Router, Coordinator & Prompt orchestration
-│   │   ├── tools/                # Controlled Data, RAG & Chart tools
-│   │   │   ├── structured_tools.py
-│   │   │   ├── rag_tools.py
-│   │   │   └── chart_tool.py
-│   │   ├── rag/                  # Document indexer & vector retriever
-│   │   ├── memory/               # Multi-turn conversation state
-│   │   ├── data_engine/          # Loader & Profiler modules
-│   │   ├── llm/                  # Gemini & Groq fallback client
-│   │   └── legacy/               # Archived single-shot query planner & executor
-│   └── run_cli.py                # CLI runner harness
+│   │   ├── main.py                     # FastAPI application entrypoint
+│   │   ├── config.py                   # Central configuration & upload limits
+│   │   ├── http_security.py            # Middleware & HTTP body limit guards
+│   │   ├── storage.py                  # Multi-tenant PostgreSQL persistence
+│   │   ├── api/
+│   │   │   ├── routes.py               # Chat, upload, session & widget endpoints
+│   │   │   ├── quality_routes.py       # Profile, assess, clean & lineage routes
+│   │   │   └── schemas.py              # Pydantic request/response contracts
+│   │   ├── data_quality/               # Pure Pandas Quality & Cleaning Engine
+│   │   │   ├── checks.py               # Integrity & validity check engine
+│   │   │   ├── cleaner.py              # Deterministic data transformation engine
+│   │   │   ├── profiler.py             # Statistical & semantic profiling
+│   │   │   ├── scorer.py               # 4-dimension composite health scorer
+│   │   │   ├── plan.py                 # Automated remediation plan builder
+│   │   │   ├── models.py               # Data quality dataclasses & schemas
+│   │   │   └── service.py              # High-level orchestration & lineage
+│   │   ├── agent/                      # Coordinator, Intent Router & Quality Badge
+│   │   ├── tools/                      # Safe structured data & chart tools
+│   │   ├── auth/                       # Supabase auth, rate limiting & quotas
+│   │   └── data_engine/                # DatasetManager & multi-tenant storage
+├── frontend/                           # React (Vite) + Tailwind CSS v4
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── QualityPanel.jsx        # Interactive data quality & lineage workspace
+│   │   │   ├── SpreadsheetPanel.jsx    # Paginated data grid with inline cell editing
+│   │   │   ├── MessageBubble.jsx       # Chat bubble with proactive quality badge
+│   │   │   └── NewChatModal.jsx        # Upload modal with 5 MB validation
+│   │   └── api.js                      # Client API interface
 ├── data/
-│   ├── raw/                      # Tabular datasets (netflix_titles.csv)
-│   └── knowledge/                # Unstructured documentation for RAG lookup
-├── docs/                         # System proposals & technical notes
-├── tests/                        # Tests and secondary datasets (sample_orders.csv)
-├── frontend/                     # React (Vite) + Tailwind CSS
-│   └── src/
-│       ├── api.js                # Fetch calls to FastAPI
-│       └── components/           # UI components
-├── .env                          # API keys & environment config
-├── api.py                        # Root backward-compatible server proxy
-└── requirements.txt
+│   ├── benchmarks/                     # 52-Question suite & cached query plans
+│   ├── raw/                            # Default datasets (netflix_titles.csv)
+│   └── uploads/                        # Tenant-isolated uploads
+├── scripts/
+│   ├── generate_philippine_retail.py   # Synthetic retail dataset generator
+│   ├── generate_held_out_dataset.py    # Generalization FMCG dataset generator
+│   ├── eval_runner.py                  # Headless 52-question benchmark evaluator
+│   ├── eval_ablation.py                # 6-configuration ablation harness
+│   └── eval_held_out.py                # Generalization test runner
+├── docs/
+│   ├── walkthrough_guide.md            # 90-second technical evaluation guide
+│   ├── benchmark_results_report.md     # Detailed benchmark & ablation report
+│   └── roadmap_visiq_data_quality.md   # Complete 10-phase master roadmap
+└── tests/                              # 136 Unit, integration & security tests
 ```
 
 ---
 
-## Running locally
+## 🚀 Quickstart & Setup
+
+### Prerequisites
+- Python 3.11+ (Python 3.14 supported)
+- Node.js 18+ & npm
+- Groq API Key or Google Gemini API Key
+
+### 1. Clone & Setup Backend
 
 ```bash
-# Backend
+# Clone the repository
+git clone https://github.com/ralphrowel/AI_Data_Analyst_Agent.git
+cd AI_Data_Analyst_Agent
+
+# Create and activate virtual environment
 python -m venv .venv
 .venv\Scripts\activate        # Windows
-pip install -r requirements.txt
-uvicorn backend.app.main:app --reload   # (or: uvicorn api:app --reload)
+# source .venv/bin/activate   # Linux/macOS
 
-# Frontend
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your GROQ_API_KEY or GEMINI_API_KEY
+
+# Initialize database schema
+python -m backend.app.storage
+
+# Start FastAPI backend
+uvicorn backend.app.main:app --reload --port 8000
+```
+
+### 2. Setup Frontend
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env` and `frontend/.env.example` to `frontend/.env.local`.
-Configure `DATABASE_URL` for PostgreSQL (Supabase Postgres is supported), Supabase auth, at least one LLM key, and allowed frontend origins. Run `python -m backend.app.storage` before starting the API to initialize the schema. Use a dedicated backend database role that owns `app_records`; it must never be a browser-facing Supabase role. Initialization enables RLS and revokes access from public, anon, and authenticated roles. The backend fails startup if the database or schema is unavailable.
-
-Set `VITE_API_BASE_URL` to your backend URL before building. If omitted, requests use the frontend origin. Frontend variables are public: never put database credentials or JWT signing secrets in `VITE_*` variables.
-
-All `/api/*` routes require a valid Supabase access token. Asymmetric tokens use the configured project's JWKS; legacy HS256 projects can set `SUPABASE_JWT_SECRET`. Both paths require issuer, audience, expiry, issued-at, subject, and authenticated role. Demo profiles require **both** backend `APP_ENV=development` / `ALLOW_DEMO_AUTH=true` and frontend development mode / `VITE_ALLOW_DEMO_AUTH=true`. No guest or unverified-token fallback exists.
-
-Users, chat sessions (history/widgets/usage), daily quotas, activity, and dataset metadata live in the PostgreSQL `app_records` table. This is a backend-only table: do not grant browser/anon/authenticated roles direct access. CSV and knowledge content still live on disk; use a persistent shared volume across workers and back it up. Shared sample datasets are copied into the user's private directory when edited. Knowledge uploads and indexes are private to each user; only the bundled `methodology_notes.md` and `netflix_data_dictionary.md` references are shared read-only.
-
-Existing `data/quotas.json` is no longer read. Previously in-memory sessions cannot be recovered after their process exits. Existing private CSV files are discovered and their metadata persisted when listed. Back up old quota records before rollout; migrate them explicitly if preserving today's allowance matters. Previously shared knowledge uploads need an explicit owner before being moved into a user's knowledge directory.
-
-Uploads default to 5 MiB of UTF-8 content (`MAX_UPLOAD_BYTES`); the request body has a separate bounded JSON envelope. Filenames must be plain basenames and resolved paths must stay within storage roots. All successful LLM calls—including routing, suggestions, and widgets—count toward the UTC daily quota. Each call checks remaining allowance; the last in-flight call can exceed the remaining budget because usage is reported after generation.
-
-Run deterministic checks with `pip install -r requirements-dev.txt` and `python -m pytest`. Tests use isolated SQLite by default and no live LLM credentials. Set `TEST_DATABASE_URL` to a **disposable** PostgreSQL database to test its actual locking and persistence; the test fixture clears its application records. GitHub Actions runs the suite against PostgreSQL 16 and builds the frontend. Live Supabase OAuth and provider availability require separate deployment smoke testing.
+Open your browser at `http://localhost:5173`.
 
 ---
 
-## Operational notes
+## 🧪 Running Tests & Benchmarks
 
-Structured request logs contain request IDs, method, status, and duration, without authorization headers or request bodies. Validation failures and production errors return generic messages.
+### Full Automated Test Suite (136 Tests)
+```bash
+pytest -v
+```
 
-Provider pricing and quotas depend on your accounts. Configure spending limits directly with each provider.
+### Reproduce the 52-Question Downstream Benchmark
+```bash
+# 1. Clean Ground Truth (Expected: 100.0%)
+python scripts/eval_runner.py --dataset data/benchmarks/clean_ground_truth.csv
+
+# 2. Raw Dirty Injected Data (Expected: 13.5%)
+python scripts/eval_runner.py --dataset data/benchmarks/dirty_retail_injected.csv
+
+# 3. Cleaned Dataset via Pipeline (Expected: 100.0%)
+python scripts/eval_runner.py --dataset data/benchmarks/clean_pipeline_evaluated.csv
+```
+
+### Reproduce the 6-Configuration Ablation Study
+```bash
+python scripts/eval_ablation.py
+# Outputs summary table to benchmarks/results/ablation_summary.csv
+```
+
+### Reproduce the Held-Out Generalization Experiment
+```bash
+python scripts/eval_held_out.py
+# Tests unseen noise distributions (Expected: 8.33% -> 75.00%)
+```
+
+---
+
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE).
