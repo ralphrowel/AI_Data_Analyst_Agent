@@ -222,7 +222,7 @@ class DataQualityService:
         score_delta = round(score_after.overall_score - score_before.overall_score, 2)
 
         # Generate target filename preserving original
-        base_stem = re.sub(r"__clean_v\d+$", "", Path(dataset_name).stem)
+        base_stem = re.sub(r"__(clean|quarantine)_v\d+$", "", Path(dataset_name).stem)
         ext = Path(dataset_name).suffix or ".csv"
 
         # Lookup lineage to determine next version number
@@ -285,6 +285,7 @@ class DataQualityService:
         version_entry = {
             "version": next_version,
             "dataset_name": target_dataset,
+            "quarantine_dataset": quarantine_dataset,
             "job_id": job_id,
             "score_before": score_before.overall_score,
             "score_after": score_after.overall_score,
@@ -297,10 +298,10 @@ class DataQualityService:
         child_lineage = DatasetLineage(
             dataset_name=target_dataset,
             role="cleaned",
-            parent_dataset=dataset_name,
+            parent_dataset=f"{base_stem}{ext}",
             version=next_version,
             job_ids=[job_id],
-            versions=[version_entry],
+            versions=list(parent_lineage.versions),
             created_at=job.created_at,
         )
 
@@ -309,6 +310,17 @@ class DataQualityService:
             storage_put("dq_jobs", owner, job_id, job.to_dict())
             storage_put("dataset_lineage", owner, f"{base_stem}{ext}", parent_lineage.to_dict())
             storage_put("dataset_lineage", owner, target_dataset, child_lineage.to_dict())
+            if quarantine_dataset:
+                quarantine_lineage = DatasetLineage(
+                    dataset_name=quarantine_dataset,
+                    role="quarantine",
+                    parent_dataset=f"{base_stem}{ext}",
+                    version=next_version,
+                    job_ids=[job_id],
+                    versions=list(parent_lineage.versions),
+                    created_at=job.created_at,
+                )
+                storage_put("dataset_lineage", owner, quarantine_dataset, quarantine_lineage.to_dict())
         except Exception as e:
             logger.warning("Failed to persist DQ job or lineage records: %s", e)
 
@@ -340,7 +352,7 @@ class DataQualityService:
             logger.warning("Failed to load lineage for '%s': %s", dataset_name, e)
 
         # Check if dataset has base original counterpart
-        base_stem = re.sub(r"__clean_v\d+$", "", Path(dataset_name).stem)
+        base_stem = re.sub(r"__(clean|quarantine)_v\d+$", "", Path(dataset_name).stem)
         ext = Path(dataset_name).suffix or ".csv"
         original_name = f"{base_stem}{ext}"
         if original_name != dataset_name:
