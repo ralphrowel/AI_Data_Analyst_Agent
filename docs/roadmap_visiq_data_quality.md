@@ -228,11 +228,17 @@ graph TD
 - [x] **4.1.5:** Evaluated generalization on the held-out dirty dataset via `scripts/eval_held_out.py` (Raw 8.33% $\rightarrow$ Cleaned **75.00%**, +66.67 percentage points).
 - [x] **4.1.6:** Authored executive evaluation report in `docs/benchmark_results_report.md` documenting methodology, tables, and per-cleaner impact.
 
-### Sprint 5 Checklist: UI Polish & Multi-Tenant Deployment Hardening (Status: Up Next)
-- [ ] **5.1.1:** Verify `QualityPanel.jsx` allows smooth toggling between raw, cleaned, and quarantine versions in the UI.
-- [ ] **5.1.2:** Test guest and authenticated flows for dataset upload $\rightarrow$ profile $\rightarrow$ clean $\rightarrow$ query workflow.
-- [ ] **5.1.3:** Verify upload size limit enforcement ($5$ MB max) and quota management on Railway backend.
-- [ ] **5.1.4:** Ensure zero regression across all 129 test cases (`pytest`).
-- [ ] **5.1.5:** Verify clean production build on frontend (`vite build`).
+### Sprint 5 Checklist: UI Polish & Multi-Tenant Deployment Hardening (Status: Complete, PR Open)
+- [x] **5.1.1:** Enhanced `frontend/src/components/QualityPanel.jsx` with an interactive version switcher, quarantine isolation banner, and one-click session toggling between raw, clean, and quarantine snapshots.
+- [x] **5.1.2:** Validated multi-tenant dataset isolation, session switching, and guest demo access in `tests/test_sprint5_hardening.py`.
+- [x] **5.1.3:** Enforced the 5 MB upload size boundary on Railway backend (HTTP 413) and added client-side validation in `frontend/src/components/NewChatModal.jsx`.
+- [x] **5.1.4:** Upgraded `backend/app/data_quality/service.py` to record quarantine dataset metadata in lineage, and auto-detect quarantine candidates in `plan.py`.
+- [x] **5.1.5:** Verified 136 passing tests across the entire test suite with zero regressions (`pytest`).
+- [x] **5.1.6:** Verified clean production build on frontend (`vite build` in 2.62s).
+
+### Sprint 6 Checklist: Packaging, Documentation & Storytelling (Status: Up Next)
+- [ ] **6.1.1:** Overhaul `README.md` highlighting the headline empirical claim (+86.54 pp accuracy gain), cross-model ablation matrix, and architecture.
+- [ ] **6.1.2:** Document the end-to-end data flow with Mermaid diagrams (Raw Upload $\rightarrow$ Profiling $\rightarrow$ Deterministic Cleaning $\rightarrow$ Lineage $\rightarrow$ Quarantine $\rightarrow$ Agent Routing).
+- [ ] **6.1.3:** Create a 90-second executive walkthrough script for portfolio demo and technical review.
 
 

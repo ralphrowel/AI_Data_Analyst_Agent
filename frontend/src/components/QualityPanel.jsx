@@ -106,6 +106,14 @@ export default function QualityPanel({
       plan.missing_strategies = strategies;
     }
 
+    if (report?.suggested_plan?.clean_currency_columns) {
+      plan.clean_currency_columns = report.suggested_plan.clean_currency_columns;
+    }
+
+    if (report?.suggested_plan?.quarantine_rules) {
+      plan.quarantine_rules = report.suggested_plan.quarantine_rules;
+    }
+
     return plan;
   };
 
@@ -197,6 +205,12 @@ export default function QualityPanel({
     );
   }
 
+  const rootDataset =
+    lineage?.parent_dataset ||
+    (lineage?.role === "original"
+      ? datasetName
+      : datasetName.replace(/__(clean|quarantine)_v\d+\.csv$/i, ".csv"));
+
   // Filter issues
   const filteredIssues = (report?.issues || []).filter((issue) => {
     if (severityFilter !== "ALL" && issue.severity !== severityFilter) return false;
@@ -214,23 +228,42 @@ export default function QualityPanel({
     <div className="flex flex-col flex-1 h-full overflow-y-auto bg-surface-50/50 dark:bg-gray-950/50">
       {/* Top Banner Alert / Switcher if cleaned version exists */}
       {appliedJob && (
-        <div className="flex items-center justify-between px-6 py-3 bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-xs animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5 bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-xs animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <svg className="w-5 h-5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>
-              Clean dataset <strong className="font-mono">{appliedJob.target_dataset}</strong> created successfully! Score improved from {appliedJob.score_before.overall_score}% to {appliedJob.score_after.overall_score}% (+{appliedJob.score_delta} pts).
-            </span>
+            <div>
+              <span>
+                Clean dataset <strong className="font-mono">{appliedJob.target_dataset}</strong> created successfully! Score improved from {Math.round(appliedJob.score_before.overall_score)}% to {Math.round(appliedJob.score_after.overall_score)}% (+{appliedJob.score_delta} pts).
+              </span>
+              {appliedJob.quarantine_dataset && (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                  🛡️ <strong>{appliedJob.audit?.rows_quarantined || "Isolated"}</strong> fatal defect records quarantined into <strong className="font-mono">{appliedJob.quarantine_dataset}</strong>.
+                </p>
+              )}
+            </div>
           </div>
-          <button
-            type="button"
-            disabled={isSwitching}
-            onClick={() => handleSwitchDataset(appliedJob.target_dataset)}
-            className="px-3 py-1.5 font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
-          >
-            {isSwitching ? "Switching..." : "Switch Active Workspace to Clean Dataset"}
-          </button>
+          <div className="flex items-center gap-2">
+            {appliedJob.quarantine_dataset && (
+              <button
+                type="button"
+                disabled={isSwitching}
+                onClick={() => handleSwitchDataset(appliedJob.quarantine_dataset)}
+                className="px-3 py-1.5 font-medium rounded-lg bg-surface-100 hover:bg-surface-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-surface-800 dark:text-gray-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Inspect Quarantine
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={isSwitching}
+              onClick={() => handleSwitchDataset(appliedJob.target_dataset)}
+              className="px-3.5 py-1.5 font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {isSwitching ? "Switching..." : "Switch Active Workspace to Clean Dataset"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -242,6 +275,98 @@ export default function QualityPanel({
       )}
 
       <div className="p-6 max-w-7xl w-full mx-auto space-y-6">
+        {/* Dataset Version Selector Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-surface-200/80 dark:border-gray-800/80 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] uppercase font-bold tracking-wider text-surface-400 dark:text-gray-500">
+              Workspace Dataset:
+            </span>
+            <span className="font-mono text-xs font-bold text-surface-900 dark:text-white px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-gray-800 border border-surface-200/60 dark:border-gray-700/60">
+              {datasetName}
+            </span>
+            {lineage?.role === "original" && (
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                Raw Upload
+              </span>
+            )}
+            {lineage?.role === "cleaned" && (
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                Cleaned v{lineage.version || 1}
+              </span>
+            )}
+            {lineage?.role === "quarantine" && (
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                Quarantine v{lineage.version || 1}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {rootDataset && rootDataset !== datasetName && (
+              <button
+                type="button"
+                disabled={isSwitching}
+                onClick={() => handleSwitchDataset(rootDataset)}
+                className="px-3 py-1.5 text-xs font-medium rounded-xl border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-300 hover:bg-surface-100 dark:hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50"
+                title={`Switch active session to raw original dataset: ${rootDataset}`}
+              >
+                ⇄ Switch to Raw
+              </button>
+            )}
+            {lineage?.versions?.map((ver) => (
+              <div key={ver.version} className="flex items-center gap-1.5">
+                {ver.dataset_name !== datasetName && (
+                  <button
+                    type="button"
+                    disabled={isSwitching}
+                    onClick={() => handleSwitchDataset(ver.dataset_name)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                    title={`Switch active session to Clean v${ver.version}`}
+                  >
+                    ✓ Clean v{ver.version} ({Math.round(ver.score_after)}%)
+                  </button>
+                )}
+                {ver.quarantine_dataset && ver.quarantine_dataset !== datasetName && (
+                  <button
+                    type="button"
+                    disabled={isSwitching}
+                    onClick={() => handleSwitchDataset(ver.quarantine_dataset)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                    title={`Inspect quarantined fatal rows (${ver.quarantine_dataset})`}
+                  >
+                    🛡️ Quarantine v{ver.version}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quarantine Archive Alert Notice */}
+        {lineage?.role === "quarantine" && (
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 text-xs flex flex-wrap items-center justify-between gap-4 animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🛡️</span>
+              <div>
+                <p className="font-bold text-sm">Quarantine Isolation Archive</p>
+                <p className="text-[11px] text-rose-700 dark:text-rose-300 mt-0.5">
+                  These records were isolated by the deterministic cleaning engine due to fatal defects (such as negative monetary amounts or unresolvable missing keys). Quarantining preserves mathematical precision in downstream AI analysis.
+                </p>
+              </div>
+            </div>
+            {rootDataset && (
+              <button
+                type="button"
+                disabled={isSwitching}
+                onClick={() => handleSwitchDataset(rootDataset)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-rose-600 text-white hover:bg-rose-500 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Return to Raw Dataset
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Row 1: Executive Quality Header Card */}
         <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-surface-200/80 dark:border-gray-800/80 shadow-xs relative overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-6">
@@ -678,7 +803,7 @@ export default function QualityPanel({
                       <p className="text-[11px] text-surface-400 dark:text-gray-500">Created: {new Date(ver.created_at).toLocaleString()}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                       Score: {ver.score_after}%
                     </span>
@@ -688,8 +813,18 @@ export default function QualityPanel({
                       onClick={() => handleSwitchDataset(ver.dataset_name)}
                       className="px-3 py-1 rounded-lg text-xs font-medium border border-surface-200 dark:border-gray-700 text-surface-700 dark:text-gray-300 hover:bg-surface-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 cursor-pointer"
                     >
-                      {ver.dataset_name === datasetName ? "Active" : "Use in Session"}
+                      {ver.dataset_name === datasetName ? "Active Clean" : "Use Clean"}
                     </button>
+                    {ver.quarantine_dataset && (
+                      <button
+                        type="button"
+                        disabled={isSwitching || ver.quarantine_dataset === datasetName}
+                        onClick={() => handleSwitchDataset(ver.quarantine_dataset)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-colors disabled:opacity-40 cursor-pointer"
+                      >
+                        {ver.quarantine_dataset === datasetName ? "Active Quarantine" : "Inspect Quarantine"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

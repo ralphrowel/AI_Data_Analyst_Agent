@@ -121,4 +121,29 @@ def generate_suggested_plan(report: QualityReport, df: pd.DataFrame) -> Dict[str
     if curr_cols:
         plan["clean_currency_columns"] = sorted(curr_cols)
 
+    # 7. Outlier and Fatal Defect Quarantine
+    non_neg_cols = []
+    for col in df.columns:
+        col_lower = col.lower()
+        if any(term in col_lower for term in ("price", "amount", "revenue", "cost", "total", "quantity")):
+            num_s = pd.to_numeric(df[col].astype(str).str.replace(r"[₱$, ]", "", regex=True), errors="coerce")
+            if (num_s < 0).any():
+                non_neg_cols.append(col)
+
+    required_cols = []
+    for col in df.columns:
+        col_lower = col.lower()
+        if "id" in col_lower or "key" in col_lower:
+            blanks = df[col].isna() | df[col].astype(str).str.strip().isin(["", "nan", "None"])
+            if blanks.any():
+                required_cols.append(col)
+
+    if non_neg_cols or required_cols:
+        q_rules = {}
+        if non_neg_cols:
+            q_rules["non_negative_columns"] = sorted(non_neg_cols)
+        if required_cols:
+            q_rules["required_columns"] = sorted(required_cols)
+        plan["quarantine_rules"] = q_rules
+
     return plan

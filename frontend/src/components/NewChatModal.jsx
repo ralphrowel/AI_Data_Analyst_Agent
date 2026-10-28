@@ -5,7 +5,9 @@ export default function NewChatModal({
   onClose,
   onCreate,
 }) {
+  const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB maximum upload size limit
   const [localFile, setLocalFile] = useState(null);
+  const [fileError, setFileError] = useState(null);
   const [customTitle, setCustomTitle] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -15,16 +17,23 @@ export default function NewChatModal({
 
   const processFile = (file) => {
     if (!file) return;
-    if (file.name.toLowerCase().endsWith(".csv")) {
-      setLocalFile(file);
-      const cleanName = file.name
-        .replace(/\.[^/.]+$/, "")
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      setCustomTitle(`${cleanName} Workspace`);
-    } else {
-      alert("Please select a valid CSV (.csv) file.");
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setFileError("Please select a valid CSV (.csv) file.");
+      setLocalFile(null);
+      return;
     }
+    if (file.size > MAX_FILE_BYTES) {
+      setFileError(`File exceeds maximum size of 5 MB (${(file.size / (1024 * 1024)).toFixed(2)} MB). Please select a dataset under 5 MB.`);
+      setLocalFile(null);
+      return;
+    }
+    setFileError(null);
+    setLocalFile(file);
+    const cleanName = file.name
+      .replace(/\.[^/.]+$/, "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    setCustomTitle(`${cleanName} Workspace`);
   };
 
   const handleFileChange = (e) => {
@@ -54,6 +63,7 @@ export default function NewChatModal({
   const handleResetFile = (e) => {
     e.stopPropagation();
     setLocalFile(null);
+    setFileError(null);
     setCustomTitle("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -115,6 +125,14 @@ export default function NewChatModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {/* File Error Alert */}
+          {fileError && (
+            <div className="p-3 text-xs rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-between animate-fadeIn">
+              <span>⚠️ {fileError}</span>
+              <button type="button" onClick={() => setFileError(null)} className="font-bold underline text-[11px] cursor-pointer">Dismiss</button>
+            </div>
+          )}
+
           {/* File Picker & Drag-and-Drop Area */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-surface-700 dark:text-gray-200">
@@ -188,7 +206,7 @@ export default function NewChatModal({
                       Click to browse or drag & drop CSV file here
                     </p>
                     <p className="text-[10px] text-surface-400 dark:text-gray-500 mt-0.5">
-                      Accepts standard tabular .csv files (e.g. Netflix, Tech Salaries)
+                      Accepts tabular .csv files up to 5 MB
                     </p>
                   </div>
                 </div>
