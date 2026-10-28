@@ -228,7 +228,7 @@ graph TD
 - [x] **4.1.5:** Evaluated generalization on the held-out dirty dataset via `scripts/eval_held_out.py` (Raw 8.33% $\rightarrow$ Cleaned **75.00%**, +66.67 percentage points).
 - [x] **4.1.6:** Authored executive evaluation report in `docs/benchmark_results_report.md` documenting methodology, tables, and per-cleaner impact.
 
-### Sprint 5 Checklist: UI Polish & Multi-Tenant Deployment Hardening (Status: Complete, PR Open)
+### Sprint 5 Checklist: UI Polish & Multi-Tenant Deployment Hardening (Status: Merged via PR #5)
 - [x] **5.1.1:** Enhanced `frontend/src/components/QualityPanel.jsx` with an interactive version switcher, quarantine isolation banner, and one-click session toggling between raw, clean, and quarantine snapshots.
 - [x] **5.1.2:** Validated multi-tenant dataset isolation, session switching, and guest demo access in `tests/test_sprint5_hardening.py`.
 - [x] **5.1.3:** Enforced the 5 MB upload size boundary on Railway backend (HTTP 413) and added client-side validation in `frontend/src/components/NewChatModal.jsx`.
@@ -236,9 +236,9 @@ graph TD
 - [x] **5.1.5:** Verified 136 passing tests across the entire test suite with zero regressions (`pytest`).
 - [x] **5.1.6:** Verified clean production build on frontend (`vite build` in 2.62s).
 
-### Sprint 6 Checklist: Packaging, Documentation & Storytelling (Status: Up Next)
-- [ ] **6.1.1:** Overhaul `README.md` highlighting the headline empirical claim (+86.54 pp accuracy gain), cross-model ablation matrix, and architecture.
-- [ ] **6.1.2:** Document the end-to-end data flow with Mermaid diagrams (Raw Upload $\rightarrow$ Profiling $\rightarrow$ Deterministic Cleaning $\rightarrow$ Lineage $\rightarrow$ Quarantine $\rightarrow$ Agent Routing).
-- [ ] **6.1.3:** Create a 90-second executive walkthrough script for portfolio demo and technical review.
+### Sprint 6 Checklist: Packaging, Documentation & Storytelling (Status: Complete, PR Open)
+- [x] **6.1.1:** Overhauled `README.md` highlighting the headline empirical claim (+86.54 pp accuracy gain), cross-model ablation matrix, reproduction commands, and tech stack.
+- [x] **6.1.2:** Documented the full end-to-end data flow with an executive Mermaid architecture diagram (Ingestion $\rightarrow$ Profiling $\rightarrow$ Deterministic Cleaning $\rightarrow$ Lineage $\rightarrow$ Quarantine $\rightarrow$ Agent Routing).
+- [x] **6.1.3:** Authored the 90-second executive walkthrough script and technical evaluator guide in `docs/walkthrough_guide.md` with step-by-step verification flows.
 
 
