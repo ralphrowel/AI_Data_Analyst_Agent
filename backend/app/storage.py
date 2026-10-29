@@ -13,10 +13,13 @@ records = Table('app_records', metadata,
     Column('key', String, primary_key=True),
     Column('payload', JSON, nullable=False))
 
+_fallback_to_sqlite: bool = False
+
 @lru_cache
 def engine():
+    global _fallback_to_sqlite
     url = os.getenv('DATABASE_URL', '').strip()
-    if not url:
+    if _fallback_to_sqlite or not url:
         from backend.app.config import DATA_DIR
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         db_path = (DATA_DIR / "visiq.db").as_posix()
@@ -31,15 +34,37 @@ def engine():
     return create_engine(url, pool_pre_ping=True)
 
 def initialize():
-    metadata.create_all(engine())
-    if engine().dialect.name == 'postgresql':
-        from sqlalchemy import text
-        with engine().begin() as conn:
-            conn.execute(text('ALTER TABLE app_records ENABLE ROW LEVEL SECURITY'))
-            conn.execute(text('REVOKE ALL ON app_records FROM PUBLIC'))
-            for role in ('anon', 'authenticated'):
-                if conn.execute(text('SELECT 1 FROM pg_roles WHERE rolname=:role'), {'role': role}).scalar():
-                    conn.execute(text(f'REVOKE ALL ON app_records FROM {role}'))
+    global _fallback_to_sqlite
+    import logging
+    logger = logging.getLogger("visiq.storage")
+
+    try:
+        metadata.create_all(engine())
+        if engine().dialect.name == 'postgresql':
+            from sqlalchemy import text
+            with engine().begin() as conn:
+                conn.execute(text('ALTER TABLE app_records ENABLE ROW LEVEL SECURITY'))
+                conn.execute(text('REVOKE ALL ON app_records FROM PUBLIC'))
+                for role in ('anon', 'authenticated'):
+                    if conn.execute(text('SELECT 1 FROM pg_roles WHERE rolname=:role'), {'role': role}).scalar():
+                        conn.execute(text(f'REVOKE ALL ON app_records FROM {role}'))
+    except Exception as exc:
+        from backend.app.config import APP_ENV, DATA_DIR
+        is_cloud_prod = (APP_ENV == "production" and os.getenv("RAILWAY_ENVIRONMENT"))
+        if not is_cloud_prod or os.getenv("ALLOW_LOCAL_DB_FALLBACK", "true").lower() in ("true", "1", "yes"):
+            logger.warning(
+                "Could not connect to remote PostgreSQL (%s). "
+                "Supabase project may be paused or unreachable. "
+                "Falling back to local SQLite database at data/visiq.db for development.",
+                exc,
+            )
+            _fallback_to_sqlite = True
+            engine.cache_clear()
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            metadata.create_all(engine())
+            logger.info("Local SQLite storage initialized successfully at data/visiq.db.")
+        else:
+            raise
 
 @contextmanager
 def transaction(kind, owner, key):
