@@ -1,378 +1,148 @@
-# Visiq Architecture Flow & API Route Topology
-
-> **Comprehensive Architectural Blueprint & Routing Specification**  
-> *Documenting the unified system architecture of Visiq after integrating the deterministic Data Quality & Cleaning Suite with the Quality-Aware Autonomous AI Data Analyst Agent.*
-
----
-
-## 1. Executive Overview & System Topology
-
-Visiq unifies two foundational systems into a single, cohesive, multi-tenant enterprise data platform:
-
-1. **Deterministic Data Quality & Cleaning Engine:** A rule-based, mathematically verifiable pipeline built on Pandas and NumPy that evaluates tabular datasets across six core quality dimensions, generates remediation plans, and executes immutable transformations while isolating irrecoverable records into dedicated quarantine tables.
-2. **Quality-Aware Autonomous AI Data Analyst Agent:** An intelligent analytical coordinator powered by high-throughput LLMs (Groq `gpt-oss-120b` and Google Gemini `gemini-2.5-flash` with dual-key rotation) that generates structured JSON tool execution plans against Pandas DataFrames—completely avoiding arbitrary code `eval()` and deterministically attaching dataset quality badges outside the LLM context to prevent prompt contamination.
+# Visiq Architecture & Route Flow Chart
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer["Frontend Client Layer (React 19 + Tailwind + Vite)"]
-        UI_HOME["Landing & Workspace (/)]"]
-        UI_CHAT["Chat & Query Panel (MessageBubble, InputBar)"]
-        UI_GRID["Spreadsheet Panel (Ag-Grid Style, Pagination, Inline Edits)"]
-        UI_DQ["Quality Health Panel (Health Badge, Issues Drawer, Plan Wizard)"]
-        UI_DASH["Live Dashboard (Pinned Insight Widgets, Auto-Recompute)"]
+    %% Styling Classes
+    classDef client fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#ffffff;
+    classDef route fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#ffffff;
+    classDef engine fill:#10b981,stroke:#047857,stroke-width:2px,color:#ffffff;
+    classDef storage fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#ffffff;
+    classDef decision fill:#ec4899,stroke:#be185d,stroke-width:2px,color:#ffffff;
+    classDef llm fill:#06b6d4,stroke:#0e7490,stroke-width:2px,color:#ffffff;
+
+    %% STAGE 1: INGESTION & UPLOAD
+    subgraph STAGE_1["1. Ingestion & Workspace Initialization"]
+        USER_UP["User Uploads CSV or Markdown"]:::client
+        USER_UP --> R_UPLOAD["POST /api/upload"]:::route
+        R_UPLOAD --> CHK_SIZE{"Size <= 5 MB?"}:::decision
+        CHK_SIZE -- "> 5 MB" --> ERR_413["HTTP 413: Upload Exceeds Limit"]
+        CHK_SIZE -- "<= 5 MB" --> CHK_TYPE{"File Type?"}:::decision
+        CHK_TYPE -- ".md / .txt" --> RAG_STORE["FileStore: Save Knowledge Doc\nAuto-trigger RAG Indexing"]:::storage
+        CHK_TYPE -- ".csv" --> FS_SAVE["FileStore: Save Raw CSV\n(Supabase Storage or data/uploads/)"]:::storage
+        FS_SAVE --> R_CREATE_SESS["POST /api/sessions"]:::route
+        R_CREATE_SESS --> INIT_SESS["SessionStore: Initialize Workspace Session\nCache In-Memory DataFrame"]:::engine
     end
 
-    subgraph SecurityGateway["FastAPI Gateway & Security Boundary (main.py)"]
-        CORS["CORSMiddleware (Vercel & Localhost Allowed)"]
-        REQ_BOUND["RequestBoundary (Size Limit: 5 MB / HTTP 413, UUID Request-ID)"]
-        AUTH_GUARD["Supabase Auth / Demo JWT Authenticator (get_current_user)"]
-        RATE_LIMIT["In-Memory Sliding Window RateLimiter (Per-Route Policies)"]
-        QUOTA_GUARD["User Quota Manager (Daily Token & Query Limits)"]
+    %% STAGE 2: DATA QUALITY & PROFILING
+    subgraph STAGE_2["2. Data Quality Profiling & Assessment"]
+        INIT_SESS --> R_QUAL["GET /api/datasets/{name}/quality"]:::route
+        R_QUAL --> CHK_HASH{"Fingerprint Cache Hit in app_records?"}:::decision
+        CHK_HASH -- "Yes (Cache Hit)" --> RET_CACHE["Return Cached Quality Assessment"]:::storage
+        CHK_HASH -- "No / Refresh" --> RUN_PROF["DataProfiler: Column Types, Nulls, Distincts"]:::engine
+        RUN_PROF --> RUN_CHECKS["DataQualityEngine: 10 Deterministic Integrity Rules"]:::engine
+        RUN_CHECKS --> RUN_SCORE["DataQualityScorer: 6 Dimensions\nCompleteness, Uniqueness, Validity,\nConsistency, Accuracy, Integrity"]:::engine
+        RUN_SCORE --> COMPUTE_GRADE["Compute Overall Health Score (0-100)\nAssign Grade (A, B, C, D, F)"]:::engine
+        COMPUTE_GRADE --> AUTO_PLAN["generate_suggested_plan: Deterministic Remediation Rules"]:::engine
+        AUTO_PLAN --> STORE_ASSESS["Cache Report in Database\n(Supabase PostgreSQL or SQLite visiq.db)"]:::storage
+        STORE_ASSESS --> UI_HEALTH["UI: Render Health Badge Pill & Issues Drawer"]:::client
     end
 
-    subgraph APIRoutes["FastAPI Application Routers"]
-        R_CORE["Core Router (backend/app/api/routes.py)"]
-        R_DQ["Quality Router (backend/app/api/quality_routes.py)"]
-    end
-
-    subgraph BusinessEngines["Business Logic & Service Layer"]
-        SVC_DQ["DataQualityService (service.py)"]
-        DM["DatasetManager (dataset_manager.py)"]
-        COORD["AgentCoordinator (coordinator.py)"]
-        WIDGET["WidgetEngine (widget_engine.py)"]
-        SESS["SessionStore (session_store.py)"]
-    end
-
-    subgraph ExecutionEngines["Execution & Intelligence Engines"]
-        ENG_PROF["DataProfiler (Statistical & Semantic Profiling)"]
-        ENG_CHECK["DataQualityEngine (Integrity Rules & Outlier Detection)"]
-        ENG_SCORE["DataQualityScorer (6-Dimension Scoring & Grades)"]
-        ENG_CLEAN["DataCleaningEngine (10-Stage Deterministic Pipeline)"]
-        ENG_ROUTER["QueryRouter (LLM Intent Classification: Structured / RAG / Hybrid)"]
-        ENG_TOOLS["ToolRegistry (Pandas Structured Tools: Filter, Agg, Group, Sort)"]
-        ENG_RAG["RAGRetriever (Knowledge Base Vector Embeddings)"]
-        ENG_CHART["ChartTool (Matplotlib In-Memory SVG / PNG Spec Generator)"]
-    end
-
-    subgraph StorageLayer["Multi-Tenant Persistence Layer"]
-        FILE_STORE["FileStore (Supabase Storage Bucket / Local filesystem uploads/)"]
-        DB_STORE["Database Storage (Supabase PostgreSQL RLS / Local SQLite visiq.db)"]
-        LLM_EXT["External LLM Providers (Groq Cloud API / Gemini API Dual Rotation)"]
-    end
-
-    %% Client to Gateway
-    ClientLayer --> CORS
-    CORS --> REQ_BOUND
-    REQ_BOUND --> AUTH_GUARD
-    AUTH_GUARD --> RATE_LIMIT
-    RATE_LIMIT --> QUOTA_GUARD
-
-    %% Gateway to Routers
-    QUOTA_GUARD --> R_CORE
-    QUOTA_GUARD --> R_DQ
-
-    %% Routers to Services
-    R_CORE --> DM
-    R_CORE --> COORD
-    R_CORE --> WIDGET
-    R_CORE --> SESS
-    R_DQ --> SVC_DQ
-
-    %% Services to Engines
-    SVC_DQ --> ENG_PROF
-    SVC_DQ --> ENG_CHECK
-    SVC_DQ --> ENG_SCORE
-    SVC_DQ --> ENG_CLEAN
-
-    COORD --> ENG_ROUTER
-    COORD --> ENG_TOOLS
-    COORD --> ENG_RAG
-    COORD --> ENG_CHART
-    COORD -.->|Deterministic Quality Badge| SVC_DQ
-
-    WIDGET --> ENG_TOOLS
-    WIDGET --> ENG_CHART
-
-    %% Services to Storage
-    DM --> FILE_STORE
-    SVC_DQ --> FILE_STORE
-    SVC_DQ --> DB_STORE
-    SESS --> DB_STORE
-    ENG_ROUTER --> LLM_EXT
-    COORD --> LLM_EXT
-```
-
----
-
-## 2. End-to-End Architectural Flowcharts
-
-### 2.1 Data Ingestion, Profiling & Health Assessment Flow
-
-When a user uploads a new dataset or requests a quality health check, the system executes an automated profiling and scoring pass. Assessment results are indexed by dataset content hash (SHA-256 fingerprint), enabling instant cached retrieval on subsequent requests without recomputing.
-
-```mermaid
-flowchart TD
-    START(["User Uploads File (.csv, .md, .txt)"]) --> HTTP_POST["POST /api/upload"]
-    
-    subgraph IngestionGuard["1. Ingestion Guardrails"]
-        HTTP_POST --> SIZE_CHK{"Content-Length <= 5 MB?"}
-        SIZE_CHK -- No --> E413["HTTP 413: Upload exceeds size limit"]
-        SIZE_CHK -- Yes --> TYPE_CHK{"File Extension?"}
-        TYPE_CHK -- ".md / .txt" --> RAG_SAVE["Save to Knowledge Store -> Auto-trigger RAG Indexing"]
-        TYPE_CHK -- ".csv" --> CSV_PARSE{"Pandas parses CSV?"}
-        CSV_PARSE -- No --> E422["HTTP 422: Invalid CSV dataset"]
-        CSV_PARSE -- Yes --> FS_SAVE["FileStore.save(owner_id, filename, csv_bytes)"]
-    end
-
-    subgraph ProfilingPipeline["2. Profiling & Fingerprinting Engine"]
-        FS_SAVE --> FP["Compute SHA-256 Fingerprint of Raw Bytes"]
-        FP --> GET_QUAL["GET /api/datasets/{name}/quality"]
-        GET_QUAL --> CHK_CACHE{"Cached report in app_records matching hash?"}
-        CHK_CACHE -- Yes & !force_refresh --> RET_CACHE["Return Cached QualityAssessmentResult"]
-        CHK_CACHE -- No / force_refresh --> PROF["DataProfiler.profile(df)"]
-        PROF --> DQE["DataQualityEngine.analyze(df)"]
-        DQE --> DQS["DataQualityScorer.score(df, report)"]
-    end
-
-    subgraph ScoringAggregation["3. Dimension Scoring & Suggestion"]
-        DQS --> DIMS["Evaluate Dimensions: Completeness, Uniqueness, Validity, Consistency, Accuracy, Integrity"]
-        DIMS --> OVERALL["Calculate Overall Score (0-100) & Grade (A, B, C, D, F)"]
-        OVERALL --> PLAN_GEN["generate_suggested_plan(report, df)"]
-        PLAN_GEN --> CACHE_PUT["storage.put('dq_reports', owner, dataset, assessment)"]
-        CACHE_PUT --> RESP_QUAL["HTTP 200: QualityAssessmentResult JSON"]
-    end
-
-    RESP_QUAL --> UI_BADGE["UI Renders Grade Pill, Score Ring, & Issue Inventory"]
-```
-
----
-
-### 2.2 Deterministic Cleaning, Quarantine & Lineage Flow
-
-Cleaning in Visiq is **stateless, deterministic, and non-destructive**. The original dataset is never overwritten. Instead, the engine creates an immutable child version (`{stem}__clean_v{N}.csv`), isolates unrecoverable records into `{stem}__quarantine_v{N}.csv`, and registers full lineage relationships in the database.
-
-```mermaid
-flowchart TD
-    USER_ACTION(["User inspects issues & configures cleaning plan"]) --> DRY_RUN{"Action Type"}
-
-    subgraph PreviewPhase["1. Stateless Dry-Run Preview"]
-        DRY_RUN -- Preview --> POST_PREV["POST /api/datasets/{name}/clean/preview"]
-        POST_PREV --> CLEAN_MEM["DataCleaningEngine.clean(raw_df, **plan) in memory"]
-        CLEAN_MEM --> COMPARE["DataQualityScorer.compare(raw_df, cleaned_df)"]
-        COMPARE --> PREV_RESP["HTTP 200: Before/After Stats, Diff Counts, Score Delta"]
-        PREV_RESP --> UI_PREV["UI displays preview diff modal without saving"]
-    end
-
-    subgraph ApplyPhase["2. Execution & Snapshot Generation"]
-        DRY_RUN -- Apply Plan --> POST_APPLY["POST /api/datasets/{name}/clean"]
-        POST_APPLY --> PIPELINE["Execute 10-Stage Cleaning Pipeline"]
+    %% STAGE 3: DETERMINISTIC CLEANING & QUARANTINE
+    subgraph STAGE_3["3. Deterministic Remediation & Lineage Engine"]
+        UI_HEALTH --> DECIDE_CLEAN{"Quality Score < 85 or User Requests Clean?"}:::decision
+        DECIDE_CLEAN -- "Preview Plan" --> R_PREVIEW["POST /api/datasets/{name}/clean/preview"]:::route
+        R_PREVIEW --> DRY_RUN["DataCleaningEngine: In-Memory Dry Run\nCalculate Diff & Before/After Score Delta"]:::engine
+        DRY_RUN --> SHOW_PREV["UI: Display Before/After Comparison Modal"]:::client
         
-        subgraph PipelineStages["Cleaning Pipeline Stages"]
-            PIPELINE --> S1["1. Normalize Column Names & Headers"]
-            S1 --> S2["2. String Whitespace Trimming"]
-            S2 --> S3["3. Categorical Casing & Alias Standardization"]
-            S3 --> S4["4. Date Normalization to ISO-8601 (YYYY-MM-DD)"]
-            S4 --> S5["5. Currency & Numeric Stripping (₱, $, commas, suffixes)"]
-            S5 --> S6["6. Outlier & Corrupt Record Quarantine Router"]
-            S6 --> S7["7. Deduplication (Exact / Key Subset)"]
-            S7 --> S8["8. Missing Value Imputation (mean, median, mode, drop)"]
-            S8 --> S9["9. Strict Type Coercion"]
-            S9 --> S10["10. Formula-Injection CSV Sanitization"]
-        end
-
-        S10 --> SPLIT{"Were fatal records quarantined?"}
-        SPLIT -- Yes --> QUAR_DF["quarantine_df -> {stem}__quarantine_v{N}.csv"]
-        SPLIT -- No / Also --> CLEAN_DF["cleaned_df -> {stem}__clean_v{N}.csv"]
-    end
-
-    subgraph LineagePersist["3. Lineage & Session Attachment"]
-        CLEAN_DF --> SAVE_CLEAN["FileStore.save(owner, clean_snapshot)"]
-        QUAR_DF --> SAVE_QUAR["FileStore.save(owner, quarantine_snapshot)"]
-        SAVE_CLEAN --> JOB_REC["Create CleaningJob Record (Score Before -> After)"]
-        SAVE_QUAR --> JOB_REC
-        JOB_REC --> LIN_REC["Update DatasetLineage (Parent original <-> Child clean_vN)"]
-        LIN_REC --> DB_SAVE["storage.put('dataset_lineage' & 'dq_jobs')"]
-        DB_SAVE --> AUTO_SWITCH["PATCH /api/sessions/{session_id}/dataset"]
-        AUTO_SWITCH --> READY(["Active Chat Session Re-pointed to Clean Dataset"])
-    end
-```
-
----
-
-### 2.3 Quality-Aware Analytics Agent Query Execution Flow
-
-When a user submits an analytical question via `POST /api/ask`, the coordinator processes the request through intent routing, structured tool execution, and dynamic chart extraction. To preserve mathematical integrity, **the quality badge is calculated deterministically outside the LLM context**, preventing model hallucination or prompt contamination.
-
-```mermaid
-flowchart TD
-    USER_QUERY(["User Question (e.g. 'What is total revenue by region?')"]) --> ASK_ROUTE["POST /api/ask"]
-
-    subgraph PreExecutionGuards["1. Security, Quota & Session Verification"]
-        ASK_ROUTE --> CHK_QUOTA{"Daily Query & Token Quota Remaining?"}
-        CHK_QUOTA -- Exceeded --> E429["HTTP 429: Daily token/query limit reached"]
-        CHK_QUOTA -- OK --> VERIFY_SESS["Resolve Session & Active Dataset (raw vs clean_vN)"]
-        VERIFY_SESS --> RECORD_TURN["SessionStore.add_turn('user', question)"]
-    end
-
-    subgraph AgentOrchestration["2. Agent Intent Routing & Tool Calling"]
-        RECORD_TURN --> ROUTER["QueryRouter.route(question)"]
-        ROUTER --> ROUTE_TYPE{"Classified Route"}
+        SHOW_PREV --> R_APPLY["POST /api/datasets/{name}/clean"]:::route
+        DECIDE_CLEAN -- "Apply Immediately" --> R_APPLY
         
-        ROUTE_TYPE -- "rag" --> RAG_EXEC["RAGRetriever: Semantic search across indexed docs"]
-        ROUTE_TYPE -- "structured" --> LLM_TOOL_PLAN["LLM Call (Groq / Gemini): Select tool & parameters"]
-        ROUTE_TYPE -- "hybrid" --> HYBRID["Execute Structured Tool + RAG Search"]
-
-        LLM_TOOL_PLAN --> TOOL_JSON["Extract Structured JSON Tool Call (NO eval())"]
-        TOOL_JSON --> TOOL_REG{"ToolRegistry.execute(tool, active_df, params)"}
+        R_APPLY --> PIPE_RUN["Execute 10-Stage Deterministic Pipeline:\n1. Column Headers & Whitespace\n2. Categorical Casing & Aliases\n3. Date Normalization (ISO-8601)\n4. Currency & Numeric Stripping\n5. Deduplication & Missing Imputation\n6. Outlier Quarantine Router"]:::engine
         
-        subgraph ToolSuite["Structured Pandas Tools"]
-            TOOL_REG --> T_SCHEMA["get_dataset_schema"]
-            TOOL_REG --> T_FILTER["filter_rows (eq, contains, gt, lt)"]
-            TOOL_REG --> T_AGG["aggregate_data (sum, mean, count, min, max)"]
-            TOOL_REG --> T_GROUP["group_data (group_by + agg)"]
-            TOOL_REG --> T_SORT["sort_data (top N, order)"]
-            TOOL_REG --> T_DQ["get_quality_report (quality stats)"]
-        end
+        PIPE_RUN --> SPLIT_DATA{"Are Corrupt Records Present?"}:::decision
+        SPLIT_DATA -- "Fatal Records (Negative totals, blank IDs)" --> QUAR_FILE["Save Quarantine Table:\n{stem}__quarantine_v1.csv"]:::storage
+        SPLIT_DATA -- "Clean Records" --> CLEAN_FILE["Save Immutable Clean Snapshot:\n{stem}__clean_v1.csv"]:::storage
+        
+        CLEAN_FILE --> REC_JOB["Record CleaningJob Audit Trail"]:::storage
+        QUAR_FILE --> REC_JOB
+        REC_JOB --> REC_LIN["Update DatasetLineage:\nOriginal (v0) -> Child Clean (v1)"]:::storage
+        
+        REC_LIN --> R_SWITCH["PATCH /api/sessions/{session_id}/dataset"]:::route
+        R_SWITCH --> SWITCH_DF["SessionStore: Hot-Swap Active Workspace DataFrame\nPoint Session to Clean Snapshot"]:::engine
     end
 
-    subgraph ResponseSynthesis["3. Chart Synthesis & Quality Badging"]
-        TOOL_REG --> EXEC_RES["Raw Pandas Tool Execution Result"]
-        EXEC_RES --> CHART_GEN["ChartTool.generate_chart & extract_chart_spec"]
-        EXEC_RES --> SUMM["LLM Natural Language Summarizer Prompt"]
-        CHART_GEN --> SPEC_OUT["Matplotlib In-Memory SVG + Base64 PNG + Spec JSON"]
-        SUMM --> TEXT_OUT["Plain-English Insight Summary"]
-
-        TEXT_OUT --> DET_BADGE["_resolve_quality_badge(dataset_name, user_id)"]
-        DET_BADGE --> BADGE_META["Deterministic Metadata: Score, Grade, Trustworthy Flag, Warning"]
+    %% STAGE 4: QUALITY-AWARE ANALYTICS AGENT
+    subgraph STAGE_4["4. Quality-Aware Agent Execution (Zero eval, Zero Contamination)"]
+        SWITCH_DF --> USER_QUERY["User Submits Natural Language Query"]:::client
+        DECIDE_CLEAN -- "Skip Cleaning (Use Raw)" --> USER_QUERY
+        
+        USER_QUERY --> R_ASK["POST /api/ask"]:::route
+        R_ASK --> CHK_QUOTA{"Daily Quota Remaining?\n(50k tokens / 10 queries)"}:::decision
+        CHK_QUOTA -- "Exceeded" --> ERR_429["HTTP 429: Quota Limit Exceeded"]
+        CHK_QUOTA -- "Permitted" --> ROUTER["QueryRouter: LLM Intent Classification"]:::engine
+        
+        ROUTER --> INTENT{"Classified Intent?"}:::decision
+        
+        INTENT -- "rag" --> RAG_SEARCH["RAGRetriever: Semantic Document Vector Search"]:::engine
+        INTENT -- "structured" --> LLM_PLAN["LLM Plan (Groq gpt-oss-120b / Gemini Dual-Key):\nSelect Tool & JSON Parameters"]:::llm
+        INTENT -- "hybrid" --> HYBRID_PLAN["Execute Structured Tool + RAG Search"]:::engine
+        
+        LLM_PLAN --> TOOL_EXEC{"ToolRegistry: Execute Tool on Active Clean DataFrame (Zero eval)"}:::engine
+        
+        TOOL_EXEC --> T_AGG["aggregate_data"]:::engine
+        TOOL_EXEC --> T_FILTER["filter_rows"]:::engine
+        TOOL_EXEC --> T_GROUP["group_data"]:::engine
+        TOOL_EXEC --> T_SORT["sort_data"]:::engine
+        TOOL_EXEC --> T_SCHEMA["get_dataset_schema"]:::engine
+        TOOL_EXEC --> T_DQ["get_quality_report"]:::engine
+        
+        T_AGG --> TOOL_OUT["Pandas Execution Result"]:::engine
+        T_FILTER --> TOOL_OUT
+        T_GROUP --> TOOL_OUT
+        T_SORT --> TOOL_OUT
+        T_SCHEMA --> TOOL_OUT
+        T_DQ --> TOOL_OUT
+        RAG_SEARCH --> TOOL_OUT
+        HYBRID_PLAN --> TOOL_OUT
+        
+        TOOL_OUT --> GEN_CHART["ChartTool: Generate Matplotlib Spec\nExtract SVG + Base64 PNG"]:::engine
+        TOOL_OUT --> GEN_SUMM["LLM Summarizer: Plain-English Insights"]:::llm
+        
+        GEN_SUMM --> DET_BADGE["_resolve_quality_badge (Deterministic Engine):\nEvaluate Active Dataset Version Role & Score\nCALCULATED OUTSIDE LLM CONTEXT"]:::engine
+        
+        GEN_CHART --> ASSEMBLE["Assemble AnalysisResponse JSON:\n- Plain English Summary\n- Interactive Chart SVG / PNG\n- Operation Spec JSON\n- Deterministic Quality Badge Metadata"]:::engine
+        DET_BADGE --> ASSEMBLE
+        
+        ASSEMBLE --> ATOMIC_REC["QuotaManager: Atomically Record Query & Tokens"]:::storage
+        ATOMIC_REC --> SESS_REC["SessionStore: Add User & Assistant Turns to History"]:::storage
+        SESS_REC --> UI_RESP["UI: Render Answer Message + Interactive Chart + Quality Badge Pill"]:::client
     end
 
-    subgraph FinalDispatch["4. Atomic Storage & Client Dispatch"]
-        BADGE_META --> ATOMIC_QUOTA["default_quota_manager.record_query(user_id)"]
-        ATOMIC_QUOTA --> SESS_TURN["SessionStore.add_turn('assistant', summary, meta)"]
-        SESS_TURN --> FINAL_RESP["HTTP 200: AnalysisResponse JSON"]
+    %% STAGE 5: DASHBOARD & ZERO-AI RECOMPUTE
+    subgraph STAGE_5["5. Dashboard Visualization & Zero-AI Recompute"]
+        UI_RESP --> PIN_WIDGET["POST /api/sessions/{id}/widgets/pin"]:::route
+        PIN_WIDGET --> SAVE_WIDGET["SessionStore: Persist Widget Spec in Dashboard"]:::storage
+        SAVE_WIDGET --> UI_DASH["Live Dashboard View"]:::client
+        
+        UI_DASH --> DATA_CHANGE{"Dataset Mutated?\n(Cell Edit / Row Add / Version Switch)"}:::decision
+        DATA_CHANGE -- "Yes" --> R_RECOMP["POST /api/sessions/{id}/widgets/recompute"]:::route
+        R_RECOMP --> ZERO_AI["WidgetEngine: Re-execute Cached Specs against active DataFrame\nRegenerate Charts with ZERO LLM Calls"]:::engine
+        ZERO_AI --> DASH_UPDATE["Dashboard Updates Instantly with 0 Tokens Consumed"]:::client
     end
-
-    FINAL_RESP --> UI_RENDER(["UI Renders Answer Text + Interactive Chart + Quality Badge Pill"])
 ```
 
 ---
 
-### 2.4 Live Dashboard Widgets & Zero-AI Auto-Recompute Flow
+## Complete API Route to Architecture Mapping
 
-Widgets pinned to a session dashboard execute dynamic analytical operations against the session's underlying dataset. If a dataset is edited in the spreadsheet or switched from raw to clean, **widgets can be recalculated with zero LLM API consumption**.
-
-```mermaid
-flowchart LR
-    subgraph WidgetCreation["Widget Creation"]
-        PIN_REQ["POST /api/sessions/{id}/widgets/pin"] --> W_PIN["WidgetEngine.create_widget_from_chat()"]
-        PROMPT_REQ["POST /api/sessions/{id}/widgets"] --> W_PROMPT["WidgetEngine.create_widget_from_prompt()"]
-        W_PIN --> STORE_W["Persist in SessionStore.widgets"]
-        W_PROMPT --> STORE_W
-    end
-
-    subgraph DatasetMutation["Dataset Mutation Trigger"]
-        EDIT["POST /api/datasets/{name}/update (Cell Edit)"] --> MUTATE["Session DataFrame Updated"]
-        ADD_ROW["POST /api/datasets/{name}/rows/add"] --> MUTATE
-        SWITCH["PATCH /api/sessions/{id}/dataset (Raw -> Clean v1)"] --> MUTATE
-    end
-
-    subgraph ZeroCostRecompute["0-AI Recomputation Engine"]
-        MUTATE --> RECOMP_REQ["POST /api/sessions/{id}/widgets/recompute"]
-        RECOMP_REQ --> ITER["Iterate through all pinned widgets"]
-        ITER --> RE_EXEC["Execute cached operation spec against new df"]
-        RE_EXEC --> RE_CHART["Regenerate Matplotlib SVG/Base64 Charts"]
-        RE_CHART --> ZERO_CALL["0 LLM Calls Consumed / 0 Quota Deducted"]
-        ZERO_CALL --> RESP_W["HTTP 200: Updated Widgets Array"]
-    end
-```
+| Step in Flow | API Route | Method | Purpose in Architecture | Key Data Artifacts |
+| :---: | :--- | :---: | :--- | :--- |
+| **1** | `/api/upload` | `POST` | Ingestion guardrail, size validation (5 MB), tenant file persistence. | Raw file in `FileStore`, metadata in database. |
+| **2** | `/api/sessions` | `POST` | Initializes workspace chat session scoped to dataset. | `SessionStore` session record with in-memory DataFrame. |
+| **3** | `/api/datasets/{name}/quality` | `GET` | Computes or returns cached 6-dimension data quality score & suggested plan. | `QualityAssessmentResult` (Score 0-100, Grade A-F). |
+| **4** | `/api/datasets/{name}/clean/preview` | `POST` | In-memory dry run comparing before/after stats without persisting files. | Diff metrics, score delta, audit preview. |
+| **5** | `/api/datasets/{name}/clean` | `POST` | Executes 10-stage deterministic cleaning pipeline, isolating corrupt rows. | Derived `{stem}__clean_v1.csv` & `{stem}__quarantine_v1.csv`. |
+| **6** | `/api/datasets/{name}/lineage` | `GET` | Fetches provenance tree and derivation hierarchy. | `DatasetLineage` object (Original $\rightarrow$ Clean v1 $\rightarrow$ v2). |
+| **7** | `/api/sessions/{id}/dataset` | `PATCH` | Hot-swaps the active dataset of the session to the clean snapshot. | Updated session pointing to clean DataFrame. |
+| **8** | `/api/ask` | `POST` | Agent pipeline: Intent routing $\rightarrow$ Structured tool execution $\rightarrow$ Chart $\rightarrow$ Summarize $\rightarrow$ Quality badge attachment. | `AnalysisResponse` with text, chart SVG, and deterministic quality badge. |
+| **9** | `/api/sessions/{id}/widgets/pin` | `POST` | Pins an analytical chart insight to the live dashboard. | Persistent widget spec JSON in session. |
+| **10** | `/api/sessions/{id}/widgets/recompute`| `POST` | Re-executes cached widget specs against mutated data with **0 LLM calls**. | Updated chart SVGs with zero token consumption. |
 
 ---
 
-## 3. Unified API Route Directory & Specifications
+## Architectural Core Tenets
 
-The table below catalogs every endpoint across the application, detailing router origin, security policies, payload contracts, service dependencies, and roles in the integrated system.
-
-| HTTP Method | Route Path | Router Module | Auth / Rate Limit Policy | Request Body / Query Params | Primary Service Invoked | Response Output | Architectural Role |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/` | `routes.py` | Public | None | None | `{"status": "...", "architecture": "modular"}` | Root service health check and gateway availability probe. |
-| `GET` | `/api/auth/me` | `routes.py` | `get_current_user` | None | `default_quota_manager` | User profile object + daily token/query quota allowance. | Hydrates client authentication state and user header pill. |
-| `GET` | `/api/user/quota` | `routes.py` | `get_current_user` | None | `default_quota_manager` | `UserQuotaResponse` (used, limit, remaining). | Real-time rate and quota usage tracking in the client header. |
-| `POST` | `/api/auth/login` | `routes.py` | Public | `LoginRequest` (`username`, `password`) | Password verification | JWT token string + User object | Administrator and internal demo credentials login. |
-| `GET` | `/api/datasets` | `routes.py` | `get_current_user` | None | `default_dataset_manager` | `List[DatasetInfo]` | Lists all accessible global datasets and private user uploads. |
-| `POST` | `/api/upload` | `routes.py` | `get_current_user`, RateLimit (5/min) | `UploadDatasetRequest` (`filename`, `content`) | `FileStore`, `storage.transaction`, `DatasetManager` | `UploadResponse` (`name`, `rows`, `cols`, `size_bytes`, `type`) | Secure ingestion of CSV datasets or RAG knowledge files (`.md`, `.txt`). |
-| `GET` | `/api/datasets/{name}/rows` | `routes.py` | `get_current_user` | `page`, `page_size`, `search`, `sort_by`, `sort_order` | `DatasetManager.get_rows_paginated()` | Paginated row array, column definitions, total row counts. | Powers interactive spreadsheet view with server-side pagination & filtering. |
-| `POST` | `/api/datasets/{name}/update` | `routes.py` | `get_current_user` | `UpdateDatasetRequest` (row, col, value) | `DatasetManager.update_cells()` | Update confirmation + synced metadata | Allows manual inline cell editing in spreadsheet grid. |
-| `POST` | `/api/datasets/{name}/rows/add` | `routes.py` | `get_current_user` | `AddRowRequest` (`row_data` object) | `DatasetManager.add_row()` | Row creation confirmation | Appends new records directly into the dataset file. |
-| `DELETE` | `/api/datasets/{name}/rows/{idx}` | `routes.py` | `get_current_user` | Path param `idx` (integer) | `DatasetManager.delete_row()` | Deletion confirmation | Deletes a record by index from the dataset file. |
-| `GET` | `/api/datasets/{name}/profile` | `quality_routes.py` | `get_current_user` | Path param `name` | `DataQualityService.profile_dataset()` | `ProfileResult` (column types, nulls, distinct counts) | Generates structural profiling data for UI metadata inspection. |
-| `GET` | `/api/datasets/{name}/quality` | `quality_routes.py` | `get_current_user`, RateLimit (30/min) | `refresh` (boolean) | `DataQualityService.assess_dataset()` | `QualityAssessmentResult` (Score, Grade, Dimensions, Issues, Plan) | Comprehensive 6-dimension data quality assessment & health score. |
-| `POST` | `/api/datasets/{name}/clean/preview` | `quality_routes.py` | `get_current_user`, RateLimit (20/min) | `CleaningPlanRequest` | `DataQualityService.preview_cleaning()` | Preview JSON (diff counts, before/after score delta, sample changes) | Zero-side-effect dry-run cleaning comparison before committing changes. |
-| `POST` | `/api/datasets/{name}/clean` | `quality_routes.py` | `get_current_user`, RateLimit (10/min) | `CleaningPlanRequest` | `DataQualityService.apply_cleaning()` | `CleaningJob` object (`target_dataset`, `quarantine_dataset`, audit) | Executes cleaning pipeline, generates derived snapshot and quarantine file. |
-| `GET` | `/api/datasets/{name}/lineage` | `quality_routes.py` | `get_current_user`, RateLimit (60/min) | Path param `name` | `DataQualityService.get_dataset_lineage()` | `DatasetLineage` (parent, children, versions, jobs) | Traces dataset derivation tree and version provenance across jobs. |
-| `GET` | `/api/sessions` | `routes.py` | `get_current_user` | None | `SessionStore.list_sessions()` | `List[SessionResponse]` | Lists all conversation workspaces owned by authenticated user. |
-| `POST` | `/api/sessions` | `routes.py` | `get_current_user` | `CreateSessionRequest` (`dataset_name`, `title`) | `SessionStore.create_session()` | `SessionResponse` | Initializes a new chat session scoped to a specific dataset. |
-| `GET` | `/api/sessions/{session_id}` | `routes.py` | `get_current_user` | Path param `session_id` | `SessionStore.get_session()` | Session object + conversation `history` array | Retrieves session details and chat message turns. |
-| `DELETE` | `/api/sessions/{session_id}` | `routes.py` | `get_current_user` | Path param `session_id` | `SessionStore.delete_session()` | `{"deleted": true, "session_id": "..."}` | Deletes session and associated conversation history. |
-| `PATCH` | `/api/sessions/{id}/dataset` | `routes.py` | `get_current_user` | `SwitchSessionDatasetRequest` (`dataset_name`) | `SessionStore.switch_dataset()` | Updated `SessionResponse` | Hot-swaps the active dataset of a session (e.g. Raw $\leftrightarrow$ Clean v1). |
-| `GET` | `/api/sessions/{id}/widgets` | `routes.py` | `get_current_user` | Path param `id` | `SessionStore.get_widgets()` | Array of pinned dashboard widget objects | Loads pinned visual widgets for the workspace dashboard. |
-| `POST` | `/api/sessions/{id}/widgets` | `routes.py` | `get_current_user` | `CreateWidgetRequest` (`prompt`, `chart_type`) | `WidgetEngine.create_widget_from_prompt()` | Newly compiled widget object | Compiles user prompt into a live, recalculable dashboard widget. |
-| `POST` | `/api/sessions/{id}/widgets/pin` | `routes.py` | `get_current_user` | `PinWidgetRequest` (`title`, `chart_svg`, spec) | `WidgetEngine.create_widget_from_chat()` | Pinned widget object | Pins a visual insight directly from chat conversation to the dashboard. |
-| `POST` | `/api/sessions/{id}/widgets/recompute` | `routes.py` | `get_current_user` | `chart_theme` (light/dark) | `WidgetEngine.recompute_widgets()` | Array of updated widget objects | Recalculates all dashboard widgets with **0 LLM calls**. |
-| `DELETE` | `/api/sessions/{id}/widgets/{w_id}` | `routes.py` | `get_current_user` | Path param `w_id` | `SessionStore.delete_widget()` | `{"deleted": true, "widget_id": "..."}` | Removes a widget from the dashboard. |
-| `GET` | `/api/recent-graphs` | `routes.py` | `get_current_user` | `limit` (default 8) | Session turn and widget scanner | `List[RecentGraphInfo]` | Retrieves thumbnail previews of recent visualizations across sessions. |
-| `GET` | `/api/dataset-changes` | `routes.py` | `get_current_user` | None | `DatasetManager.get_activity_log()` | List of activity log entries | Audit feed of data modifications, uploads, and clean derivations. |
-| `GET` | `/api/suggestions` | `routes.py` | `get_current_user`, RateLimit (30/min) | `session_id`, `provider` | `call_llm` with `SUGGESTION_PROMPT` | Array of 4 recommended analytical questions | Context-aware query suggestions tailored to active dataset schema. |
-| `POST` | `/api/ask` | `routes.py` | `get_current_user`, RateLimit (15/min) | `QuestionRequest` (`question`, `chart_type`, `provider`) | `AgentCoordinator.process_query()` | `AnalysisResponse` (summary, chart, spec, badge) | Main AI agent endpoint: routes intent, executes tools, attaches badge. |
-
----
-
-## 4. Multi-Tenant Storage, Database & Cloud Resiliency Architecture
-
-Visiq is engineered to run seamlessly across both cloud production (Railway + Supabase) and isolated local development environments without code changes.
-
-```mermaid
-flowchart TD
-    subgraph DataStorageLayer["Storage Abstraction Layer"]
-        subgraph FilePersistence["File Storage Abstraction (file_storage.py)"]
-            F_ENV{"SUPABASE_SERVICE_KEY present?"}
-            F_ENV -- Yes (Cloud Prod) --> SB_BUCKET["Supabase Storage Bucket ('visiq-uploads')"]
-            F_ENV -- No (Local Dev) --> LOCAL_DIR["Local Filesystem Directory (data/uploads/{user_id}/)"]
-        end
-
-        subgraph DatabasePersistence["Relational Storage Abstraction (storage.py)"]
-            D_ENV{"DATABASE_URL present?"}
-            D_ENV -- Yes --> TRY_PG["Connect to Remote PostgreSQL (Supabase Pooler)"]
-            TRY_PG -- Connection Succeeded --> PG_DB["Remote PostgreSQL with Row Level Security (RLS)"]
-            TRY_PG -- psycopg.OperationalError (e.g. Paused) --> DB_FALLBACK["Self-Healing Fallback to SQLite"]
-            D_ENV -- No --> SQLITE_DB["Local SQLite Engine (sqlite:///data/visiq.db)"]
-            DB_FALLBACK --> SQLITE_DB
-        end
-    end
-
-    subgraph DataIsolation["Multi-Tenant Isolation Model"]
-        TENANT_KEY["Record Key Composition: (kind, owner_id, entity_name)"]
-        TENANT_KEY --> RLS_POLICY["PostgreSQL RLS: owner = auth.uid()"]
-        TENANT_KEY --> SQLITE_ISOL["SQLite Filter: WHERE owner = :user_id"]
-    end
-
-    SB_BUCKET --> DataIsolation
-    LOCAL_DIR --> DataIsolation
-    PG_DB --> DataIsolation
-    SQLITE_DB --> DataIsolation
-```
-
-### Self-Healing Database Fallback Mechanism
-1. **Cloud Production (`APP_ENV=production` & `RAILWAY_ENVIRONMENT`):** Connects to remote Supabase PostgreSQL via connection pooler (port `6543`), enforces Row Level Security (RLS), and revokes public permissions.
-2. **Local Development Resilience:** If remote PostgreSQL is unreachable (such as when a free-tier Supabase project is paused or offline), [`backend/app/storage.py`](file:///c:/Users/ralph/Desktop/Projects/Data%20Analyst/Ai%20Data%20Analyst%20Agent/backend/app/storage.py) intercepts the `OperationalError`, logs a clear warning, clears the cached engine, and automatically initializes local SQLite storage at `data/visiq.db`.
-3. **Zero-Latency Option:** Setting `DATABASE_URL=` in `.env` bypasses remote network handshakes entirely, booting the server in under 0.5 seconds.
-
----
-
-## 5. Architectural Guardrails & Methodological Guarantees
-
-1. **Additive Error Benchmark Integrity:** Injected benchmark defects (duplicates, negative prices, invalid keys) are designed to be additive on top of clean ground truth. Deterministic deduplication and outlier quarantine restore ground truth without lowering the theoretical accuracy ceiling.
-2. **Zero LLM Prompt Contamination:** Quality health badges (`Computed on cleaned version (score: 96/100, Grade A)`) are deterministically resolved in the API route handler *outside* the LLM prompt context. The LLM receives only clean dataset schemas and filtered records, ensuring unbiased reasoning.
-3. **Strict Zero-`eval()` Security Boundary:** The agent never generates or executes raw Python scripts. All operations translate into strict, parameterized calls to pre-compiled Pandas functions registered in `ToolRegistry`.
-4. **Non-Destructive Lineage Tracking:** Cleaning operations never mutate original source files. Every cleaning run produces a versioned child snapshot (`__clean_v1.csv`), an optional quarantine file (`__quarantine_v1.csv`), and an immutable audit job record.
-5. **Atomic Quota & Sliding-Window Rate Limiting:** In-memory sliding-window rate limiters prevent API spam on expensive endpoints (`/api/ask`, `/api/upload`), while the `QuotaManager` atomically tracks daily token consumption across LLM model rotations.
-
+1. **Deterministic Quality Isolation (Outside LLM Context):** The LLM agent is never asked to judge its own data quality. Quality scores and badges are computed mathematically by `DataQualityScorer` and attached by the route coordinator, completely preventing prompt contamination.
+2. **Strict Zero-`eval()` Security:** The agent generates strictly typed JSON tool parameters for pre-registered Pandas functions (`filter_rows`, `aggregate_data`, `group_data`, `sort_data`), preventing arbitrary code injection.
+3. **Additive Error Model & Pure Lineage:** Injected benchmark errors are additive, allowing the deterministic cleaner and quarantine router to restore ground truth with 100% precision without mutating the original source file.
+4. **Self-Healing Storage Resiliency:** When cloud PostgreSQL is unreachable, the system automatically falls back to local SQLite at `data/visiq.db`, guaranteeing continuous operation.
