@@ -1,5 +1,7 @@
 # Visiq Architecture & Route Flow Chart
 
+![Visiq End-to-End System Architecture & Route Flow](images/visiq_architecture_flowchart.png)
+
 ```mermaid
 flowchart TD
     %% Styling Classes
